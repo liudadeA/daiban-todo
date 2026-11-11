@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""《2027年数据结构考研复习指导》第4章(p109) ~ 第8章(p390) 细化到页的学习计划生成器。
+"""《2027年数据结构考研复习指导》第4章(p109) ~ 第8章(p390) 按“约1小时一项”整理的学习计划生成器（v2.1）。
 
 用法: python3 tool/gen_ds_plan.py 408复习计划.txt 输出目录
   - 数据结构_串起_细化到页.txt   单独的数据结构细化计划
   - 408复习计划_v2.txt           用细化计划替换原计划里“串”之后的数据结构条目，其余科目不变
 
 规则：
-  * 窗口 = 原计划里数据结构从“第4章 串”(2026-11-11 下午) 到 2026-11-21 的 21 个半天(上午/下午)。
-  * 每个半天分到的“学习量”相同；页数按权重折算：正文/试题/归纳/思维拓展每页 1.0，答案与解析每页 0.8。
-  * 页范围按累计权重切到各半天，一个小节被切开时后半段标“（续）”。
-  * 同一起始页的相邻小节合并为一条任务。
+  * 窗口 2026-11-11 ~ 2026-11-21；11-11 上午已被 3.4 数组占用，所以第一天只按半天份量分配。
+  * 每项任务是相关小节的合并（同一节的“试题精选+答案与解析”合为一项做题+对答案），约 6~12 页 / 约 1 小时；
+    过长的试题+答案块拆成（上）/（下）。不再按上午/下午/晚上切，也没有“（续）”。
+  * 页范围按目录页码；相邻任务共享的起止页（同一页含两节）会在两项里各出现一次。
+  * 按“工作量”（答案与解析按 0.8 折算）的累计中点把任务依次分到各天，保证每天负荷大致均衡。
 """
 import re, sys, datetime, os
 
-# (名称, 起始页, 类型)  类型: t 正文, q 试题, a 答案, s 归纳/思维拓展
+# 类型: t 正文, q 试题, a 答案, s 归纳/思维拓展  （用于估算页权重）
 LEAVES = [
  ("第4章 串 引言 + 4.1 串的定义和实现", 109, 't'),
  ("4.1.1 串的定义", 110, 't'), ("4.1.2 串的基本操作", 110, 't'), ("4.1.3 串的存储结构", 111, 't'),
@@ -68,71 +69,84 @@ LEAVES = [
  ("8.7.6 本节试题精选", 385, 'q'), ("8.7.7 答案与解析", 386, 'a'), ("第8章 归纳总结和重难点", 386, 's'),
  ("第8章 思维拓展", 390, 's'),
 ]
-END_PAGE = 390          # 391 为参考文献，不安排
+
+# (任务名, 起页, 止页)
+TASKS = [
+ ("4.1 串的定义与存储+4.2 模式匹配：简单匹配+KMP+KMP优化", 109, 118),
+ ("4.2 本节试题精选+答案与解析（做题+对答案）+第4章归纳总结与思维拓展", 119, 124),
+ ("5.1 树的基本概念与性质（含试题+答案）+5.2 二叉树的定义与存储结构", 124, 132),
+ ("5.2 二叉树 本节试题精选+答案与解析（做题+对答案）", 133, 139),
+ ("5.3 二叉树的遍历+线索二叉树", 140, 145),
+ ("5.3 本节试题精选+答案与解析（上）", 146, 156),
+ ("5.3 本节试题精选+答案与解析（下）", 157, 167),
+ ("5.4 树与森林：存储结构+树/森林/二叉树转换+遍历（含试题+答案）", 168, 179),
+ ("5.5 哈夫曼树与哈夫曼编码+并查集", 180, 184),
+ ("5.5 本节试题精选+答案与解析（做题+对答案）+第5章归纳总结与思维拓展", 185, 193),
+ ("6.1 图的基本概念（含试题+答案）", 194, 200),
+ ("6.2 图的存储：邻接矩阵+邻接表+十字链表+邻接多重表+基本操作", 201, 206),
+ ("6.2 本节试题精选+答案与解析（做题+对答案）", 206, 213),
+ ("6.3 图的遍历：BFS+DFS+连通性（含试题+答案）", 214, 220),
+ ("6.4 最小生成树(Prim/Kruskal)+最短路径(Dijkstra/Floyd)", 221, 227),
+ ("6.4 DAG表达式+拓扑排序+关键路径", 228, 233),
+ ("6.4 本节试题精选+答案与解析（上）", 234, 247),
+ ("6.4 本节试题精选+答案与解析（下）+第6章归纳总结与思维拓展", 248, 262),
+ ("第7章引言+7.1/7.2 顺序+折半+分块查找（含试题+答案）", 263, 271),
+ ("7.3 二叉排序树(BST)", 272, 277),
+ ("7.3 平衡二叉树(AVL)+红黑树", 278, 290),
+ ("7.3 本节试题精选+答案与解析（做题+对答案）", 291, 303),
+ ("7.4 B树与B+树（含试题+答案）", 304, 316),
+ ("7.5 散列表：基本概念+散列函数+处理冲突+查找性能", 317, 323),
+ ("7.5 本节试题精选+答案与解析（做题+对答案）+第7章归纳总结", 324, 330),
+ ("第7章思维拓展+第8章引言+8.1 排序概念+8.2 插入排序：直接插入+折半插入+希尔", 331, 337),
+ ("8.2 本节试题精选+答案与解析+8.3 冒泡排序+快速排序", 338, 345),
+ ("8.3 本节试题精选+答案与解析（做题+对答案）", 346, 351),
+ ("8.4 选择排序：简单选择+堆排序", 351, 356),
+ ("8.4 本节试题精选+答案与解析（做题+对答案）", 357, 363),
+ ("8.5 归并排序+基数排序+计数排序（含试题+答案）", 363, 372),
+ ("8.6 内部排序算法比较与应用（含试题+答案）", 373, 379),
+ ("8.7 外部排序：基本概念+多路归并+败者树+置换选择+最佳归并树（含试题+答案）", 380, 386),
+ ("第8章归纳总结和重难点+思维拓展", 386, 390),
+]
 FIRST, LAST_DAY = datetime.date(2026, 11, 11), datetime.date(2026, 11, 21)
+FIRST_DAY_SHARE = 0.6   # 11-11 上午被 3.4 数组占用
 WEIGHT = {'t': 1.0, 'q': 1.0, 'a': 0.8, 's': 1.0}
 
 
-def groups():
-    """同起始页的相邻小节合并；返回 [(名称, 起页, 止页, 单页权重)]"""
-    out, i = [], 0
-    while i < len(LEAVES):
-        j = i
-        while j + 1 < len(LEAVES) and LEAVES[j + 1][1] == LEAVES[i][1]:
-            j += 1
-        names = []
-        for n, _, _ in LEAVES[i:j + 1]:
-            names.append(n)
-        w = max(WEIGHT[k] for _, _, k in LEAVES[i:j + 1])
-        nxt = LEAVES[j + 1][1] if j + 1 < len(LEAVES) else END_PAGE + 1
-        out.append((' + '.join(names), LEAVES[i][1], nxt - 1, w))
-        i = j + 1
-    return out
+def page_weight(p):
+    kind = 't'
+    for _, st, k in LEAVES:
+        if st <= p:
+            kind = k
+    return WEIGHT[kind]
 
 
 def build():
-    gs = groups()
-    pages = []  # (page, group_idx, weight)
-    for gi, (_, a, b, w) in enumerate(gs):
-        for p in range(a, b + 1):
-            pages.append((p, gi, w))
-    total = sum(w for _, _, w in pages)
+    ws = [sum(page_weight(p) for p in range(a, b + 1)) for _, a, b in TASKS]
     days = [FIRST + datetime.timedelta(d) for d in range((LAST_DAY - FIRST).days + 1)]
-    slots = [(d, h) for d in days for h in ('上午', '下午')][1:]  # 11-11 上午 已被 3.4 数组 占用
-    n = len(slots)
-    acc, assign = 0.0, {}
-    for p, gi, w in pages:
+    shares = [FIRST_DAY_SHARE] + [1.0] * (len(days) - 1)
+    tot_share, tot = sum(shares), sum(ws)
+    bounds, c = [], 0.0
+    for s_ in shares:
+        c += s_
+        bounds.append(c / tot_share * tot)
+    acc, out = 0.0, []
+    for (nm, a, b), w in zip(TASKS, ws):
         mid = acc + w / 2
         acc += w
-        assign[p] = min(n - 1, int(mid / total * n))
-    tasks = []
-    for si, (d, h) in enumerate(slots):
-        for gi, (name, a, b, _) in enumerate(gs):
-            ps = [p for p in range(a, b + 1) if assign[p] == si]
-            if not ps:
-                continue
-            first_part = ps[0] == a
-            rng = f"p{ps[0]}" if ps[0] == ps[-1] else f"p{ps[0]}-{ps[-1]}"
-            nm = name if first_part else name + "（续）"
-            tasks.append((d, si, h, nm, rng, sum(WEIGHT_OF[p] for p in ps)))
-    return tasks, slots, total
+        di = next(i for i, bd in enumerate(bounds) if mid <= bd)
+        out.append((days[di], nm, f"p{a}" if a == b else f"p{a}-{b}", w))
+    return out, tot
 
 
-WEIGHT_OF = {}
-for _gi, (_n, _a, _b, _w) in enumerate(groups()):
-    for _p in range(_a, _b + 1):
-        WEIGHT_OF[_p] = _w
-
-
-def line(d, h, nm, rng):
+def line(d, nm, rng):
     ds = d.isoformat()
-    return f"数据结构 {h} {nm} {rng} +408 +数据结构 due:{ds} t:{ds}"
+    return f"数据结构 {nm} {rng} +408 +数据结构 due:{ds} t:{ds}"
 
 
 def main():
     src, outdir = sys.argv[1], sys.argv[2]
-    tasks, slots, total = build()
-    new = [(t[0], t[1], line(t[0], t[2], t[3], t[4])) for t in tasks]
+    tasks, total = build()
+    new = [(t[0], 0, line(t[0], t[1], t[2])) for t in tasks]
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, '数据结构_串起_细化到页.txt'), 'w', encoding='utf8') as f:
         f.write('\n'.join(l for _, _, l in new) + '\n')
@@ -147,11 +161,15 @@ def main():
         keep.append(l)
     rows = [(datetime.date.fromisoformat(re.search(r'due:(\S+)', l).group(1)), -1, l) for l in keep]
     rows += new
-    rows.sort(key=lambda r: (r[0], r[1]))  # 稳定排序：同一天旧条目(-1)在前，新条目按半天顺序
+    rows.sort(key=lambda r: (r[0], r[1]))
     with open(os.path.join(outdir, '408复习计划_v2.txt'), 'w', encoding='utf8') as f:
         f.write('\n'.join(r[2] for r in rows) + '\n')
-    pages = END_PAGE - 109 + 1
-    print(f"tasks={len(new)} removed_old={removed} kept_old={len(keep)} total_lines={len(rows)} pages={pages} weighted={total:.1f} slots={len(slots)} per_slot={total/len(slots):.1f}")
+    per = {}
+    for t in tasks:
+        per.setdefault(t[0], []).append(t)
+    for d, ts in per.items():
+        print(d, len(ts), f"{sum(t[3] for t in ts):.1f}", ' | '.join(t[2] for t in ts))
+    print(f"tasks={len(new)} removed_old={removed} kept_old={len(keep)} total_lines={len(rows)} weighted={total:.1f}")
 
 
 if __name__ == '__main__':
