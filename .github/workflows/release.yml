@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release 标签，例如 v1.4.1'
+        description: 'Release 标签，例如 v1.5.0'
         required: true
-        default: 'v1.4.1'
+        default: 'v1.5.0'
   push:
     tags: ['v*']
 
