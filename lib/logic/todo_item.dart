@@ -170,7 +170,39 @@ class TodoItem {
   bool _isTag(String t) =>
       (t.startsWith('due:') && Ymd.parse(t.substring(4)) != null) ||
       (t.startsWith('t:') && Ymd.parse(t.substring(2)) != null) ||
+      (t.startsWith('plan:') && Ymd.parse(t.substring(5)) != null) ||
       _isPf(t);
+
+  // ------------------------------------------------ 原计划日期（隐藏标签 plan:）
+  //
+  // “完成即提前 / 整体顺延”会改写 due/t，所以另外用 plan:YYYY-MM-DD 记住每条任务最初计划的日期，
+  // 预计完成时间按它来算。标签不在界面中显示；完成后保留（已完成的计划日也要计入）。
+
+  /// 原计划日期标签（没有则 null）
+  DateTime? get plan => _tag('plan');
+  set plan(DateTime? v) => _setTag('plan', v);
+
+  /// 原计划日期：优先用 plan: 标签；老数据没有标签时，用当前日期并加回未过期的提前记录推算。
+  DateTime? get planOrDate {
+    final p = plan;
+    if (p != null) return p;
+    final d = date;
+    if (d == null) return null;
+    var gap = 0;
+    for (final r in pulls) {
+      gap += r.gap;
+    }
+    return Ymd.add(d, gap);
+  }
+
+  /// 补写 plan: 标签（已有则不动；无日期的任务没有计划日）。返回是否有改动。
+  bool ensurePlan() {
+    if (plan != null) return false;
+    final p = planOrDate;
+    if (p == null) return false;
+    plan = p;
+    return true;
+  }
 
   // ------------------------------------------------ 提前记录（隐藏标签 pf:）
   //

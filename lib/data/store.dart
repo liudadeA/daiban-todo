@@ -136,6 +136,12 @@ class TodoStore extends ChangeNotifier {
   Future<void> load() async {
     todo = await _readFile(todoFile);
     done = await _readFile(doneFile);
+    // 老数据没有 plan: 标签：补写并落盘一次
+    if (_ensurePlans()) {
+      await dir.create(recursive: true);
+      await todoFile.writeAsString(_join(todo), encoding: utf8);
+      await doneFile.writeAsString(_join(done), encoding: utf8);
+    }
     notifyListeners();
     await _afterPersist();
   }
@@ -156,7 +162,17 @@ class TodoStore extends ChangeNotifier {
         .toList();
   }
 
+  /// 给所有有日期但没有 plan: 的任务补上原计划日期。返回是否有改动。
+  bool _ensurePlans() {
+    var changed = false;
+    for (final t in [...todo, ...done]) {
+      if (t.ensurePlan()) changed = true;
+    }
+    return changed;
+  }
+
   Future<void> _save() async {
+    _ensurePlans();
     await dir.create(recursive: true);
     await todoFile.writeAsString(_join(todo), encoding: utf8);
     await doneFile.writeAsString(_join(done), encoding: utf8);
@@ -240,12 +256,15 @@ class TodoStore extends ChangeNotifier {
     final parsed = TodoItem.parse(text, today: today);
     if (parsed == null) return;
     _pushUndo();
+    final oldDate = item.date, oldPlan = item.plan;
     item.tokens = parsed.tokens;
     // 编辑页里类别单独编辑：正文中不含类别标签，这里把它放回第一个 +标签
     item.setCategory(category);
     item.priority = priority;
     item.due = due;
     item.start = start;
+    // 日期没改就保留原计划日期；用户手动改了日期则视为重新计划
+    if (oldPlan != null && item.date == oldDate) item.plan = oldPlan;
     await _save();
   }
 
@@ -315,6 +334,9 @@ class TodoStore extends ChangeNotifier {
     final seenTodo = todo.map((e) => e.toLine()).toSet();
     final seenDone = done.map((e) => e.toLine()).toSet();
     var skipped = 0;
+    for (final i in [...p.todo, ...p.done]) {
+      i.ensurePlan(); // 导入时记下原计划日期
+    }
     for (final i in p.todo) {
       if (seenTodo.add(i.toLine())) {
         todo.add(i);
@@ -406,7 +428,11 @@ class TodoStore extends ChangeNotifier {
     if (list.isEmpty || days == 0) return 0;
     _pushUndo();
     for (final i in list) {
+      i.ensurePlan();
+      final p = i.plan;
       i.shift(days);
+      // 手动批量平移视为重新计划：原计划日期跟着移动
+      if (p != null) i.plan = Ymd.add(p, days);
     }
     await _save();
     return list.length;
