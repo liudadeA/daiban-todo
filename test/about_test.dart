@@ -37,6 +37,12 @@ void main() {
     expect(texts, contains('GPL-3.0'));
     expect(texts, contains('due:'));
     expect(find.textContaining('待办'), findsWidgets);
+    expect(find.byKey(const Key('introText')), findsOneWidget);
+    expect(introText, contains('AI'));
+    expect(introText, contains('一键导入'));
+    expect(introText, contains('可以直接把上方格式说明复制给 AI'));
+    expect(tester.getTopLeft(find.byKey(const Key('introText'))).dy, lessThan(tester.getTopLeft(find.text('开源协议')).dy));
+    expect(tester.getTopLeft(find.byKey(const Key('introText'))).dy, greaterThan(tester.getTopLeft(find.text('导入格式')).dy));
     expect(find.textContaining('代办'), findsNothing);
     await tester.tap(find.byKey(const Key('copyExample')));
     await tester.pump();

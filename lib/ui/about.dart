@@ -20,6 +20,12 @@ const importFormatExplain = '''各部分含义：
 • @情境 —— 可选的情境标签
 • .ics 日历文件也可以导入：每天的事件会自动拆成“一项一条”的任务，导出时也能生成 .ics''';
 
+const introText = '''待办 是一款兼容 todo.txt 格式的安卓待办清单：按类别自动顺延未完成的任务、做完后自动提前后续任务。
+
+本作是为了借助 AI 更高效地做计划：把学习资料、目录或需求交给 AI，让它按本应用的导入格式生成计划，再一键导入（支持 txt / ics）。导入之后，应用负责按日期展示，未完成的任务自动顺延，完成后同一类别的后续任务自动提前。
+
+小提示：可以直接把上方格式说明复制给 AI。''';
+
 const licenseText = '''本应用借鉴 topydo 的 todo.txt 格式与排序 / 到期日语义，并同样以 GNU GPL-3.0 许可发布，源代码与 LICENSE 全文见本仓库。
 
 本程序是自由软件：你可以依据自由软件基金会发布的 GNU 通用公共许可证（第 3 版，或你选择的更新版本）重新分发和 / 或修改它。本程序的发布是希望它有用，但没有任何担保；甚至没有适销性或特定用途适用性的默示担保。''';
@@ -85,7 +91,7 @@ class AboutPage extends StatelessWidget {
             ),
             // 2. 简介
             h('简介'),
-            const SelectableText('待办 是一款兼容 todo.txt 格式的安卓待办清单：按类别自动顺延未完成的任务、做完后自动提前后续任务。'),
+            const SelectableText(introText, key: Key('introText'), style: TextStyle(height: 1.5)),
             // 3. 协议（置于最后，只保留本仓库链接）
             h('开源协议'),
             const SelectableText(licenseText, key: Key('licenseText'), style: TextStyle(height: 1.5)),
