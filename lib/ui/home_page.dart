@@ -89,9 +89,9 @@ class HomePageState extends State<HomePage> {
   Future<void> _batchReopen() async {
     final items = _selected.where((t) => t.done).toList();
     if (items.isEmpty) return;
-    await store.reopenMany(items);
+    final msg = await store.reopenMany(items);
     _exitSelection();
-    _toast('已恢复 ${items.length} 项到待办', undo: true);
+    _toast(msg ?? '已恢复 ${items.length} 项到待办', undo: true);
   }
 
   Future<void> _batchCategory() async {
@@ -149,6 +149,12 @@ class HomePageState extends State<HomePage> {
       duration: Duration(seconds: seconds),
       action: undo ? SnackBarAction(label: '撤销', onPressed: () => store.undo()) : null,
     ));
+  }
+
+  Future<void> _reopen(TodoItem item) async {
+    final msg = await store.reopen(item);
+    if (!mounted) return;
+    _toast(msg ?? '已恢复到待办', undo: true, seconds: 3);
   }
 
   Future<void> _complete(TodoItem item) async {
@@ -335,8 +341,9 @@ class HomePageState extends State<HomePage> {
               color: (c ?? Colors.blueGrey).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
           child: Text(s, style: TextStyle(fontSize: 12, color: c ?? Colors.blueGrey.shade700)),
         );
-    if (t.due != null) chips.add(chip('截止 ${Ymd.fmt(t.due!)}', c: overdue ? Colors.red : null));
-    if (t.start != null) chips.add(chip('开始 ${Ymd.fmt(t.start!)}', c: Colors.teal));
+    if (!doneTile && t.pulledOn(today)) chips.add(chip('已提前到今日', c: Colors.teal));
+    if (t.due != null) chips.add(chip('截止 ${Ymd.chipLabel(t.due!, today)}', c: overdue ? Colors.red : null));
+    if (t.start != null) chips.add(chip('开始 ${Ymd.chipLabel(t.start!, today)}', c: Colors.teal));
     if (doneTile && t.completionDate != null) {
       chips.add(chip('完成于 ${Ymd.fmt(t.completionDate!)}', c: Colors.green));
     }
@@ -359,7 +366,7 @@ class HomePageState extends State<HomePage> {
           ? Checkbox(value: selected, onChanged: (_) => _toggleSel(t))
           : Checkbox(
               value: doneTile,
-              onChanged: (_) => doneTile ? store.reopen(t) : _complete(t),
+              onChanged: (_) => doneTile ? _reopen(t) : _complete(t),
             ),
       title: Text.rich(TextSpan(children: [
         if (pri != null)

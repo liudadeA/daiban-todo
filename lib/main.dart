@@ -66,6 +66,8 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
 
   /// 回到前台时先从磁盘重新读取（桌面组件可能已勾选完成），再检查是否跨天。
   Future<void> _onResume() async {
+    // 组件的后台 isolate 可能已经改过设置（上次处理日期等），先重读再做跨日检查。
+    await widget.store.prefs.reload();
     await widget.store.load();
     await _dayCheck();
   }

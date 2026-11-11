@@ -39,6 +39,9 @@ Future<void> syncTodayWidget(TodoStore store) async {
 Future<void> widgetBackgroundCallback(Uri? uri) async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  // 后台 isolate 会长期复用，必须先重读，否则看不到主界面写入的“上次处理日期”和各开关，
+  // 会重复顺延或用过期设置。
+  await prefs.reload();
   final dir = await getApplicationDocumentsDirectory();
   final store = TodoStore(dir: dir, prefs: prefs);
   await store.load();
