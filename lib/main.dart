@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/store.dart';
 import 'ui/home_page.dart';
+import 'widget_sync.dart';
+import 'package:home_widget/home_widget.dart';
 
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -15,6 +17,8 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final dir = await getApplicationDocumentsDirectory();
   final store = TodoStore(dir: dir, prefs: prefs);
+  store.onPersisted = () => syncTodayWidget(store);
+  await HomeWidget.registerInteractivityCallback(widgetBackgroundCallback);
   await store.load();
   runApp(DaibanApp(store: store));
 }
@@ -57,7 +61,13 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _dayCheck();
+    if (state == AppLifecycleState.resumed) _onResume();
+  }
+
+  /// 回到前台时先从磁盘重新读取（桌面组件可能已勾选完成），再检查是否跨天。
+  Future<void> _onResume() async {
+    await widget.store.load();
+    await _dayCheck();
   }
 
   /// 打开 / 回到前台时检查是否跨天，并按设置整体顺延。

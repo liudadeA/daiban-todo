@@ -55,6 +55,9 @@ class TodoStore extends ChangeNotifier {
   /// 单步撤销快照（两个文件的全部行 + 上次处理日期）
   _Snapshot? _undo;
 
+  /// 数据写入磁盘后的回调（用于刷新桌面组件）。测试里不设置。
+  Future<void> Function()? onPersisted;
+
   TodoStore({required this.dir, required this.prefs, DateTime Function()? now})
       : _now = now ?? DateTime.now;
 
@@ -134,6 +137,7 @@ class TodoStore extends ChangeNotifier {
     todo = await _readFile(todoFile);
     done = await _readFile(doneFile);
     notifyListeners();
+    await _afterPersist();
   }
 
   Future<List<TodoItem>> _readFile(File f) async {
@@ -157,6 +161,13 @@ class TodoStore extends ChangeNotifier {
     await todoFile.writeAsString(_join(todo), encoding: utf8);
     await doneFile.writeAsString(_join(done), encoding: utf8);
     notifyListeners();
+    await _afterPersist();
+  }
+
+  Future<void> _afterPersist() async {
+    try {
+      await onPersisted?.call();
+    } catch (_) {}
   }
 
   static String _join(List<TodoItem> l) => l.isEmpty ? '' : '${l.map((e) => e.toLine()).join('\n')}\n';
