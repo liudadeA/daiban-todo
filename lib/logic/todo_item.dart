@@ -3,6 +3,24 @@ import 'dates.dart';
 /// 一条 todo.txt 任务。语义参考 topydo / todo.txt 规范：
 ///   [x 完成日期] [(A)] [创建日期] 文本 +项目 @情境 key:value ...
 /// 其中 due:YYYY-MM-DD 为截止日期，t:YYYY-MM-DD 为开始日期（未到开始日期不在“今日”显示）。
+/// 一次“完成即提前”的记录：哪天、第几次（同一天内递增）、提前了几天。
+class PullRecord {
+  final DateTime day;
+  final int seq;
+  final int gap;
+  const PullRecord(this.day, this.seq, this.gap);
+
+  String get encoded => '${Ymd.fmt(day).replaceAll('-', '')}.$seq.$gap';
+
+  static PullRecord? decode(String s) {
+    final m = RegExp(r'^(\d{4})(\d{2})(\d{2})\.(\d+)\.(\d+)$').firstMatch(s);
+    if (m == null) return null;
+    final d = Ymd.parse('${m[1]}-${m[2]}-${m[3]}');
+    if (d == null) return null;
+    return PullRecord(d, int.parse(m[4]!), int.parse(m[5]!));
+  }
+}
+
 class TodoItem {
   static int _counter = 0;
 
@@ -151,7 +169,66 @@ class TodoItem {
 
   bool _isTag(String t) =>
       (t.startsWith('due:') && Ymd.parse(t.substring(4)) != null) ||
-      (t.startsWith('t:') && Ymd.parse(t.substring(2)) != null);
+      (t.startsWith('t:') && Ymd.parse(t.substring(2)) != null) ||
+      _isPf(t);
+
+  // ------------------------------------------------ 提前记录（隐藏标签 pf:）
+  //
+  // 每次“完成即提前”会给被平移的所有未完成任务写入 pf:YYYYMMDD.序号.天数（多次提前用逗号累加），
+  // 记录文件里，所以重启 / 组件后台操作后仍能据此把这一批还原。标签不在界面中显示，
+  // 任务完成时清除，隔天由 [TodoStore.checkDayChange] 清理。
+  static bool _isPf(String t) => t.startsWith('pf:') && t.length > 3 && _decodePf(t) != null;
+
+  static List<PullRecord>? _decodePf(String t) {
+    final out = <PullRecord>[];
+    for (final part in t.substring(3).split(',')) {
+      final r = PullRecord.decode(part);
+      if (r == null) return null;
+      out.add(r);
+    }
+    return out;
+  }
+
+  int get _pfIndex => tokens.indexWhere(_isPf);
+
+  /// 按时间顺序（先 → 后）的提前记录
+  List<PullRecord> get pulls {
+    final i = _pfIndex;
+    return i < 0 ? const [] : _decodePf(tokens[i]) ?? const [];
+  }
+
+  void _setPulls(List<PullRecord> l) {
+    final i = _pfIndex;
+    if (l.isEmpty) {
+      if (i >= 0) tokens.removeAt(i);
+    } else {
+      final t = 'pf:${l.map((e) => e.encoded).join(',')}';
+      if (i >= 0) {
+        tokens[i] = t;
+      } else {
+        tokens.add(t);
+      }
+    }
+  }
+
+  void addPull(DateTime day, int seq, int gap) => _setPulls([...pulls, PullRecord(day, seq, gap)]);
+
+  /// 弹出最近一次提前记录（用于还原）
+  PullRecord? popPull() {
+    final l = [...pulls];
+    if (l.isEmpty) return null;
+    final r = l.removeLast();
+    _setPulls(l);
+    return r;
+  }
+
+  void clearPulls() => _setPulls(const []);
+
+  /// 清理早于 [day] 的记录（隔天后不再允许还原）
+  void dropPullsBefore(DateTime day) => _setPulls(pulls.where((e) => !e.day.isBefore(day)).toList());
+
+  /// 今天被提前过（且记录仍在）
+  bool pulledOn(DateTime day) => pulls.any((e) => e.day == day);
 
   List<String> get projects =>
       tokens.where((t) => t.length > 1 && t.startsWith('+')).map((t) => t.substring(1)).toList();
@@ -243,6 +320,7 @@ class TodoItem {
     if (done) return;
     done = true;
     completionDate = today;
+    clearPulls(); // 提前记录只对未完成任务有意义
     if (priority != null) {
       tokens.add('pri:$priority');
       priority = null;

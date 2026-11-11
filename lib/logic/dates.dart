@@ -51,4 +51,23 @@ class Ymd {
     }
     return null;
   }
+
+  /// 相对今天的叫法：今日 / 明日 / 后天 / 昨日 / 逾期 N 天；更远的返回 null（调用方显示完整日期）。
+  /// 每次渲染时用当前的 [today] 现算，不缓存。
+  static String? relative(DateTime d, DateTime today) {
+    final n = diff(d, today);
+    if (n == 0) return '今日';
+    if (n == 1) return '明日';
+    if (n == 2) return '后天';
+    if (n == -1) return '昨日';
+    if (n < -1 && n >= -30) return '逾期 ${-n} 天';
+    return null;
+  }
+
+  /// 任务标签用的日期文字：近的用“今日/明日…（MM-DD）”，远的用完整日期。
+  static String chipLabel(DateTime d, DateTime today) {
+    final r = relative(d, today);
+    if (r == null) return fmt(d);
+    return '$r（${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}）';
+  }
 }

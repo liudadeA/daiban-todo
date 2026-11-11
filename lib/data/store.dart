@@ -203,6 +203,9 @@ class TodoStore extends ChangeNotifier {
     }
     String? msg;
     _pushUndo();
+    for (final i in todo) {
+      i.dropPullsBefore(t); // 提前记录只在当天有效
+    }
     final moved = Planner.shiftBackByCategory(todo, last, t, enabled: shiftEnabledFor);
     if (moved.isNotEmpty) {
       final parts = moved.entries.map((e) => '${categoryLabel(e.key)} ${e.value} 天').join('、');
@@ -286,15 +289,9 @@ class TodoStore extends ChangeNotifier {
     return msgs.isEmpty ? null : msgs.join('；');
   }
 
-  /// 在已完成列表里取消完成，回到待办。
-  Future<void> reopen(TodoItem item) async {
-    if (!done.contains(item)) return;
-    _pushUndo();
-    item.reopen();
-    done.remove(item);
-    todo.add(item);
-    await _save();
-  }
+  /// 在已完成列表里取消完成，回到待办。若该类别刚刚“完成即提前”过、现在今天又有了原本的未完成任务，
+  /// 就把提前的那一批还原回原日期（只显示今天的）。返回提示消息（无则 null）。
+  Future<String?> reopen(TodoItem item) => reopenMany([item]);
 
   // ---------------------------------------------------------------- 导入 / 导出
 
@@ -415,17 +412,25 @@ class TodoStore extends ChangeNotifier {
     return list.length;
   }
 
-  /// 批量取消完成
-  Future<void> reopenMany(Iterable<TodoItem> items) async {
+  /// 批量取消完成；每个受影响的类别各自判断是否要还原刚才的提前。
+  Future<String?> reopenMany(Iterable<TodoItem> items) async {
     final list = items.where(done.contains).toList();
-    if (list.isEmpty) return;
+    if (list.isEmpty) return null;
     _pushUndo();
+    final cats = <String?>{};
     for (final i in list) {
       i.reopen();
       done.remove(i);
       todo.add(i);
+      cats.add(i.category);
+    }
+    final t = today;
+    final msgs = <String>[];
+    for (final c in cats) {
+      if (Planner.revertPulls(todo, t, c) > 0) msgs.add(c == null ? '已还原刚才提前的任务' : '$c 已还原刚才提前的任务');
     }
     await _save();
+    return msgs.isEmpty ? null : msgs.join('；');
   }
 
   /// 导出为 .ics（每个有日期的待办一个全日事件）。

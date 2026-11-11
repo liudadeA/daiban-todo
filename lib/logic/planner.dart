@@ -53,7 +53,8 @@ class Planner {
   /// 使下一批出现在今天。返回提前的天数（0 表示没有变化）。
   /// [force] 为 true 时（手动“提前下一批”）即使今天还有未完成任务也提前。
   static int pullForward(List<TodoItem> items, DateTime today, {bool force = false}) {
-    if (!force && items.any((t) => inToday(t, today))) return 0;
+    final todayEmpty = !items.any((t) => inToday(t, today));
+    if (!force && !todayEmpty) return 0;
     DateTime? next;
     for (final t in items) {
       final d = t.date;
@@ -62,11 +63,56 @@ class Planner {
     }
     if (next == null) return 0;
     final gap = Ymd.diff(next, today);
+    // 今日已清空时的提前才记录（可由“取消完成”还原）；今天还有任务时的手动强制提前不记录。
+    final seq = todayEmpty ? _nextSeq(items, today) : null;
     for (final t in items) {
       final d = t.date;
-      if (!t.done && d != null && !d.isBefore(next)) t.shift(-gap);
+      if (!t.done && d != null && !d.isBefore(next)) {
+        t.shift(-gap);
+        if (seq != null) t.addPull(today, seq, gap);
+      }
     }
     return gap;
+  }
+
+  static int _nextSeq(List<TodoItem> items, DateTime today) {
+    var m = 0;
+    for (final t in items) {
+      for (final r in t.pulls) {
+        if (r.day == today && r.seq > m) m = r.seq;
+      }
+    }
+    return m + 1;
+  }
+
+  /// 还原“完成即提前”：只要今天的任务里同时存在“原本就是今天的未完成任务”（没有今日提前记录）
+  /// 和“被提前过来的任务”，就把最近一次提前整体还原（被平移的任务各自回到原日期），
+  /// 必要时连续还原多次，直到今日里不再同时有两种任务。返回还原的次数。
+  /// 只处理 [category]（null = 未分类）的任务，只还原今天做的提前。
+  static int revertPulls(List<TodoItem> items, DateTime today, String? category) {
+    var n = 0;
+    for (var guard = 0; guard < 50; guard++) {
+      final group = items.where((t) => !t.done && t.category == category).toList();
+      final todays = group.where((t) => inToday(t, today)).toList();
+      final hasOriginal = todays.any((t) => !t.pulledOn(today));
+      final hasPulled = todays.any((t) => t.pulledOn(today));
+      if (!hasOriginal || !hasPulled) break;
+      var latest = 0;
+      for (final t in group) {
+        final l = t.pulls;
+        if (l.isNotEmpty && l.last.day == today && l.last.seq > latest) latest = l.last.seq;
+      }
+      if (latest == 0) break;
+      for (final t in group) {
+        final l = t.pulls;
+        if (l.isNotEmpty && l.last.day == today && l.last.seq == latest) {
+          final r = t.popPull()!;
+          t.shift(r.gap);
+        }
+      }
+      n++;
+    }
+    return n;
   }
 
   /// 按类别分组（保持原顺序）。key 为 null 表示“未分类”。
