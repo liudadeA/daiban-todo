@@ -92,7 +92,7 @@ void main() {
       expect(due(byText(s, '再后一')), '2026-11-13');
       expect(due(byText(s, '再后二')), '2026-11-15');
       expect(byText(s, '次批一').pulls, isEmpty);
-      expect(byText(s, '次批一').toLine(), '次批一 +408 due:2026-11-12 t:2026-11-12');
+      expect(byText(s, '次批一').toLine(), '次批一 +408 due:2026-11-12 t:2026-11-12 plan:2026-11-12');
       final todays = s.todo.where((t) => t.category == '408' && Planner.inToday(t, s.today)).map((t) => t.text).toList();
       expect(todays, ['今日乙']);
       // 其它类别不受影响

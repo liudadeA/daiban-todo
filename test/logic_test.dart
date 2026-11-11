@@ -333,7 +333,7 @@ void main() {
       expect(Ymd.fmt(store.todo[0].due!), '2026-11-11');
       expect(store.todo[0].creationDate, d('2026-11-10'));
       await store.update(store.todo[0], '改过的任务 +考研', priority: 'A', due: d('2026-11-15'), start: d('2026-11-14'));
-      expect(store.todo[0].toLine(), '(A) 2026-11-10 改过的任务 +考研 due:2026-11-15 t:2026-11-14');
+      expect(store.todo[0].toLine(), '(A) 2026-11-10 改过的任务 +考研 due:2026-11-15 t:2026-11-14 plan:2026-11-15');
       await store.update(store.todo[0], '改过的任务', priority: null, due: null, start: null);
       expect(store.todo[0].date, isNull);
       await store.complete(store.todo[0]);
