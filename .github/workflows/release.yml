@@ -1,0 +1,57 @@
+name: build-and-release
+
+# 手动触发：构建 arm64 / armeabi-v7a APK（调试证书签名，可直接侧载）并发布到 GitHub Release。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release 标签，例如 v1.2.0'
+        required: true
+        default: 'v1.2.0'
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - name: 生成启动图标
+        run: |
+          pip install pillow
+          python3 tool/gen_icons.py
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: 构建 APK（按 ABI 拆分）
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64,android-arm
+      - name: 重命名
+        run: |
+          VER=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/daiban-arm64-v${VER}.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/daiban-armeabi-v7a-v${VER}.apk
+          ls -l dist
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          NOTES="代办 ${TAG}：兼容 topydo / todo.txt 的安卓待办。arm64-v8a（绝大多数手机）装 arm64 包；老设备装 armeabi-v7a 包。调试证书签名，需允许安装未知来源应用。"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --clobber
+          else
+            gh release create "$TAG" dist/*.apk --target "${{ github.sha }}" --title "代办 ${TAG}" --notes "$NOTES"
+          fi
