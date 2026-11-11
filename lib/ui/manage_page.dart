@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../logic/estimator.dart';
 import 'category_widgets.dart';
 
 /// 批量管理：删除全部、清空已完成、按类别删除 / 重命名。
@@ -82,7 +83,8 @@ class ManagePage extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.folder_outlined),
                 title: Text(store.categoryLabel(c)),
-                subtitle: Text('待办 ${todoN(c)} · 已完成 ${doneN(c)}'),
+                isThreeLine: true,
+                subtitle: Text(Estimator.detail(Estimator.forCategory(store.todo, store.done, store.today, c), store.today).join('\n')),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   IconButton(
                     icon: const Icon(Icons.drive_file_rename_outline),

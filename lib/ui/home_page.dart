@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../data/store.dart';
 import '../logic/dates.dart';
+import '../logic/estimator.dart';
 import '../logic/planner.dart';
 import '../logic/todo_item.dart';
 import 'about.dart';
@@ -436,8 +437,9 @@ class HomePageState extends State<HomePage> {
     ];
     for (final g in rows) {
       final cleared = g.today.isEmpty;
+      final est = Estimator.forCategory(store.todo, store.done, today, g.cat);
       children.add(Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+        padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
         child: Row(children: [
           Expanded(
             child: Text(
@@ -458,6 +460,11 @@ class HomePageState extends State<HomePage> {
               label: const Text('提前下一批'),
             ),
         ]),
+      ));
+      children.add(Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+        child: Text(Estimator.compact(est, today),
+            key: Key('est_${g.cat ?? ''}'), style: const TextStyle(fontSize: 12, color: Colors.black45)),
       ));
       children.addAll(g.today.map((t) => _tile(t)));
       children.addAll(g.undated.map((t) => _tile(t)));
