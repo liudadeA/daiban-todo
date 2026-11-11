@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release 标签，例如 v1.2.0'
+        description: 'Release 标签，例如 v1.3.0'
         required: true
-        default: 'v1.2.0'
+        default: 'v1.3.0'
   push:
     tags: ['v*']
 
@@ -49,9 +49,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          NOTES="代办 ${TAG}：兼容 topydo / todo.txt 的安卓待办。arm64-v8a（绝大多数手机）装 arm64 包；老设备装 armeabi-v7a 包。调试证书签名，需允许安装未知来源应用。"
+          NOTES="待办 ${TAG}：兼容 topydo / todo.txt 的安卓待办。arm64-v8a（绝大多数手机）装 arm64 包；老设备装 armeabi-v7a 包。调试证书签名，需允许安装未知来源应用。"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.apk --clobber
           else
-            gh release create "$TAG" dist/*.apk --target "${{ github.sha }}" --title "代办 ${TAG}" --notes "$NOTES"
+            gh release create "$TAG" dist/*.apk --target "${{ github.sha }}" --title "待办 ${TAG}" --notes "$NOTES"
           fi
