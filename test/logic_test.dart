@@ -157,7 +157,8 @@ void main() {
       final gap = Planner.pullForward(items, today);
       expect(gap, 1);
       expect(dates(items), ['2026-11-11', '2026-11-11', '2026-11-11', '2026-11-13', '2026-11-19', '-']);
-      expect(items[2].toLine(), 'B2 due:2026-11-11 t:2026-11-11');
+      expect(items[2].toLine(), 'B2 due:2026-11-11 t:2026-11-11 pf:20261111.1.1'); // 隐藏的提前记录，供“取消完成”还原
+      expect(items[2].text, 'B2'); // 不出现在显示文字里
     });
     test('下一批隔了几天：提前整个间隔', () {
       final items = [p('B due:2026-11-15'), p('C due:2026-11-17')];
