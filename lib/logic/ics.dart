@@ -185,7 +185,7 @@ class Ics {
 
   /// 把待办导出为 .ics（每个有日期的任务一个全日事件）。
   static String exportTodo(Iterable<({String text, String note, DateTime date, String uid})> tasks,
-      {String calName = '代办', DateTime? now}) {
+      {String calName = '待办', DateTime? now}) {
     final stamp = _stamp(now ?? DateTime.now().toUtc());
     final b = StringBuffer();
     void line(String l) {

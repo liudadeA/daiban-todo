@@ -531,7 +531,7 @@ class HomePageState extends State<HomePage> {
           },
           child: Scaffold(
           appBar: _selMode ? _selectionBar() : AppBar(
-            title: Text('代办 · ${titles[_tab]}'),
+            title: Text('待办 · ${titles[_tab]}'),
             actions: [
               PopupMenuButton<String>(
                 onSelected: (v) {
