@@ -2,11 +2,17 @@ import 'dates.dart';
 
 /// 一条专注记录（正向计时的一次开始→结束）。
 class FocusSession {
+  static const forward = 'forward';
+  static const countdown = 'countdown';
+
   final String id;
   final String? category;
   final DateTime start;
   final DateTime end;
   final bool interrupted;
+
+  /// [forward] = 正向计时；[countdown] = 锁屏倒计时
+  final String kind;
 
   const FocusSession({
     required this.id,
@@ -14,7 +20,10 @@ class FocusSession {
     required this.start,
     required this.end,
     required this.interrupted,
+    this.kind = forward,
   });
+
+  bool get isCountdown => kind == countdown;
 
   int get seconds {
     final n = end.difference(start).inSeconds;
@@ -29,6 +38,7 @@ class FocusSession {
         'start': start.millisecondsSinceEpoch,
         'end': end.millisecondsSinceEpoch,
         'interrupted': interrupted,
+        'kind': kind,
       };
 
   static FocusSession? fromJson(Map<String, dynamic> m) {
@@ -42,6 +52,7 @@ class FocusSession {
       start: DateTime.fromMillisecondsSinceEpoch(startMs),
       end: DateTime.fromMillisecondsSinceEpoch(endMs),
       interrupted: m['interrupted'] == true,
+      kind: m['kind'] == countdown ? countdown : forward,
     );
   }
 }
@@ -60,8 +71,9 @@ class FocusSlice {
 class PeriodStats {
   final int count;
   final int seconds;
+  final int interrupted; // 其中锁屏倒计时被中断的次数（正向计时的退出不算）
   final List<FocusSlice> slices; // 按时长降序
-  const PeriodStats({required this.count, required this.seconds, required this.slices});
+  const PeriodStats({required this.count, required this.seconds, required this.slices, this.interrupted = 0});
 
   static const empty = PeriodStats(count: 0, seconds: 0, slices: []);
   bool get isEmpty => count == 0 && seconds == 0;
@@ -99,7 +111,8 @@ class FocusCalc {
     }
     final slices = map.entries.map((e) => FocusSlice(e.key, e.value.sec, e.value.n)).toList()
       ..sort((a, b) => b.seconds != a.seconds ? b.seconds.compareTo(a.seconds) : (a.category ?? '').compareTo(b.category ?? ''));
-    return PeriodStats(count: list.length, seconds: total, slices: slices);
+    return PeriodStats(
+        count: list.length, seconds: total, slices: slices, interrupted: list.where((e) => e.interrupted && e.isCountdown).length);
   }
 
   static PeriodStats all(Iterable<FocusSession> s) => of(s);

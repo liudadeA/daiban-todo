@@ -12,7 +12,9 @@ import '../platform/pin.dart';
 class StatsPage extends StatefulWidget {
   final TodoStore store;
   final FocusStore focus;
-  const StatsPage({super.key, required this.store, required this.focus});
+  /// 作为底栏标签页嵌入时只返回内容，不带自己的 Scaffold / AppBar
+  final bool embedded;
+  const StatsPage({super.key, required this.store, required this.focus, this.embedded = false});
 
   @override
   State<StatsPage> createState() => _StatsPageState();
@@ -149,9 +151,7 @@ class _StatsPageState extends State<StatsPage> {
         final today = FocusCalc.forDay(focus.sessions, _day);
         final dist = _dist;
         final hours = FocusCalc.hourDistribution(focus.sessions, _month.year, _month.month);
-        return Scaffold(
-          appBar: AppBar(title: const Text('统计数据')),
-          body: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), child: Column(children: [
+        final body = SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), child: Column(children: [
             _card(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('累计专注', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
@@ -160,6 +160,7 @@ class _StatsPageState extends State<StatsPage> {
                   _metric('次数', '${all.count}', key: const Key('stats_all_count')),
                   _metric('时长', _splitDur(all.seconds), key: const Key('stats_all_dur')),
                   _metric('日均时长', _splitDur(daily), key: const Key('stats_all_avg')),
+                  _metric('中断次数', '${all.interrupted}', key: const Key('stats_all_interrupted')),
                 ]),
               ]),
             ),
@@ -176,6 +177,7 @@ class _StatsPageState extends State<StatsPage> {
                 Row(children: [
                   _metric('次数', '${today.count}', key: const Key('stats_day_count')),
                   _metric('时长', _splitDur(today.seconds), key: const Key('stats_day_dur')),
+                  _metric('中断次数', '${today.interrupted}', key: const Key('stats_day_interrupted')),
                 ]),
               ]),
             ),
@@ -261,8 +263,9 @@ class _StatsPageState extends State<StatsPage> {
                 SizedBox(height: 160, child: _HourBars(hours: hours)),
               ]),
             ),
-          ])),
-        );
+          ]));
+        if (widget.embedded) return body;
+        return Scaffold(appBar: AppBar(title: const Text('统计数据')), body: body);
       },
     );
   }
@@ -326,7 +329,7 @@ class FocusRecordsPage extends StatelessWidget {
                   leading: Icon(s.interrupted ? Icons.pause_circle_outline : Icons.timer_outlined,
                       color: Color(FocusColors.of(s.category).argb)),
                   title: Text(store.categoryLabel(s.category)),
-                  subtitle: Text('$span${s.interrupted ? '  ·  已中断' : ''}'),
+                  subtitle: Text('$span${s.isCountdown ? '  ·  锁屏' : ''}${s.interrupted ? '  ·  已中断' : ''}'),
                   trailing: Text(FocusCalc.fmtDuration(s.seconds)),
                 );
               },
