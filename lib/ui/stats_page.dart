@@ -6,7 +6,7 @@ import '../data/focus_store.dart';
 import '../data/store.dart';
 import '../logic/dates.dart';
 import '../logic/focus.dart';
-import '../platform/pin.dart';
+import 'stats_export.dart';
 
 /// 统计数据：累计 / 当日 / 时长分布（日周月自定义）/ 本月时段分布。
 class StatsPage extends StatefulWidget {
@@ -19,6 +19,10 @@ class StatsPage extends StatefulWidget {
   @override
   State<StatsPage> createState() => _StatsPageState();
 }
+
+/// 最近一次分享的 Future（测试用，等待图片生成与分享调用完成）。
+@visibleForTesting
+Future<String>? debugLastStatsShare;
 
 enum _RangeKind { day, week, month, custom }
 
@@ -109,17 +113,49 @@ class _StatsPageState extends State<StatsPage> {
     });
   }
 
+  bool _sharing = false;
+
+  /// 导出用数据：饼图跟随当前选中的周期（日/周/月/自定义），柱图用当前显示的月份。
+  StatsExportData exportData() {
+    final name = switch (_kind) {
+      _RangeKind.day => '日',
+      _RangeKind.week => '周',
+      _RangeKind.month => '月',
+      _RangeKind.custom => '自定义',
+    };
+    return StatsExportData(
+      generatedOn: store.today,
+      all: FocusCalc.all(focus.sessions),
+      dailyAvgSeconds: FocusCalc.averageDailySeconds(focus.sessions),
+      day: _day,
+      dayStats: FocusCalc.forDay(focus.sessions, _day),
+      periodName: name,
+      periodRange: _distTitle,
+      dist: _dist,
+      barYear: _month.year,
+      barMonth: _month.month,
+      hours: FocusCalc.hourDistribution(focus.sessions, _month.year, _month.month),
+      labelOf: _label,
+    );
+  }
+
+  /// 分享：生成一张同时包含饼图和柱图的 PNG，调起系统分享面板。
   Future<void> _share() async {
-    final s = _dist;
-    final b = StringBuffer('待办 · 专注时长分布（$_distTitle）\n总计 ${FocusCalc.fmtDuration(s.seconds)}');
-    if (s.count > 0) b.write(' · ${s.count} 次');
-    b.writeln();
-    for (final e in s.slices) {
-      final p = (e.shareOf(s.seconds) * 100).toStringAsFixed(1);
-      b.writeln('${_label(e.category)} ${FocusCalc.fmtDuration(e.seconds)} $p%');
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    final f = shareStatsImage(exportData());
+    debugLastStatsShare = f;
+    try {
+      await f;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('生成分享图片失败，请重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
-    if (s.isEmpty) b.writeln('这段时间还没有专注记录');
-    await ScreenPin.share(b.toString());
   }
 
   void _openRecords() {
@@ -186,7 +222,7 @@ class _StatsPageState extends State<StatsPage> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   const Expanded(child: Text('专注时长分布', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
-                  TextButton(onPressed: _share, child: const Text('分享')),
+                  TextButton(key: const Key('stats_share'), onPressed: _sharing ? null : _share, child: Text(_sharing ? '生成中…' : '分享')),
                   _arrows(onPrev: () => _shiftDist(-1), onNext: () => _shiftDist(1)),
                 ]),
                 Text(_distTitle, style: const TextStyle(color: Colors.black54)),
@@ -215,7 +251,7 @@ class _StatsPageState extends State<StatsPage> {
                       ? const Center(child: Text('这段时间还没有专注记录', style: TextStyle(color: Colors.black45)))
                       : CustomPaint(
                           key: const Key('stats_pie'),
-                          painter: _PiePainter(dist, _label),
+                          painter: FocusPiePainter(dist, _label),
                           child: const SizedBox.expand(),
                         ),
                 ),
@@ -336,50 +372,6 @@ class FocusRecordsPage extends StatelessWidget {
             ),
     );
   }
-}
-
-class _PiePainter extends CustomPainter {
-  final PeriodStats stats;
-  final String Function(String?) labelOf;
-  _PiePainter(this.stats, this.labelOf);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = math.min(size.width, size.height) * 0.32;
-    var start = -math.pi / 2;
-    final total = stats.seconds;
-    if (total <= 0) return;
-    for (final e in stats.slices) {
-      final sweep = e.shareOf(total) * math.pi * 2;
-      final paint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = Color(FocusColors.of(e.category).argb);
-      canvas.drawArc(Rect.fromCircle(center: c, radius: r), start, sweep, true, paint);
-      // 标签放在弧中点外侧
-      if (sweep > 0.12) {
-        final mid = start + sweep / 2;
-        final tp = TextPainter(
-            text: TextSpan(
-                text: '${FocusCalc.fmtDuration(e.seconds)}\n${labelOf(e.category)}',
-                style: const TextStyle(color: Colors.black87, fontSize: 11, height: 1.2)),
-            textDirection: TextDirection.ltr,
-            textAlign: TextAlign.center)
-          ..layout();
-        final pos = Offset(c.dx + math.cos(mid) * (r + 28) - tp.width / 2, c.dy + math.sin(mid) * (r + 28) - tp.height / 2);
-        final line = Paint()
-          ..color = Colors.black38
-          ..strokeWidth = 1;
-        canvas.drawLine(Offset(c.dx + math.cos(mid) * r, c.dy + math.sin(mid) * r),
-            Offset(c.dx + math.cos(mid) * (r + 16), c.dy + math.sin(mid) * (r + 16)), line);
-        tp.paint(canvas, pos);
-      }
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _PiePainter old) => old.stats != stats;
 }
 
 class _HourBars extends StatelessWidget {

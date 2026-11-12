@@ -33,10 +33,9 @@ class ScreenPin {
     } catch (_) {}
   }
 
-  static Future<void> share(String text) async {
-    try {
-      await channel.invokeMethod('share', {'text': text});
-    } catch (_) {}
+  /// 用系统分享面板分享一张图片（PNG 文件路径，须在应用缓存的 share/ 目录下）。
+  static Future<void> shareImage(String path, {String title = '分享'}) async {
+    await channel.invokeMethod('shareImage', {'path': path, 'title': title});
   }
 
   /// 系统解除屏幕固定时回调。返回取消订阅的函数。
