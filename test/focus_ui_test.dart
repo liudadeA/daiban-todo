@@ -79,7 +79,8 @@ void main() {
     expect(find.byKey(const Key('timer_start_数学')), findsOneWidget);
     expect(find.text('正向计时'), findsWidgets);
     expect(find.text('开始'), findsWidgets);
-    expect(find.byKey(const Key('stats_open')), findsOneWidget);
+    expect(find.byKey(const Key('stats_open')), findsNothing); // 统计只在底栏
+      expect(find.byType(NavigationDestination), findsNWidgets(5));
   });
 
   testWidgets('开始进入全屏秒表并请求屏幕固定；结束并记录为正常完成', (tester) async {
