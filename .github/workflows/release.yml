@@ -7,7 +7,7 @@ on:
       tag:
         description: 'Release 标签，例如 v1.6.1'
         required: true
-        default: 'v1.6.1'
+        default: 'v1.6.2'
   push:
     tags: ['v*']
 
