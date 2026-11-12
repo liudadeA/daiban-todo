@@ -69,7 +69,7 @@ class HomePageState extends State<HomePage> {
       _toast(notice, seconds: 5);
     }
     if (!f.isCountdown) return;
-    setState(() => _tab = 3);
+    setState(() => _tab = 2);
     await ScreenPin.setKeepScreenOn(true);
     await ScreenPin.start();
     if (!mounted) return;
@@ -80,7 +80,7 @@ class HomePageState extends State<HomePage> {
     ));
   }
 
-  bool get _todoTab => _tab <= 2;
+  bool get _todoTab => _tab == 0 || _tab == 1 || _tab == 3;
 
   List<TodoItem> _tabItems() {
     final today = store.today;
@@ -89,7 +89,7 @@ class HomePageState extends State<HomePage> {
         return store.todo.where((t) => Planner.inToday(t, today) || Planner.undatedVisible(t, today)).toList();
       case 1:
         return [...store.todo];
-      case 2:
+      case 3:
         return [...store.done];
       default:
         return [];
@@ -675,7 +675,7 @@ class HomePageState extends State<HomePage> {
     return ListenableBuilder(
       listenable: Listenable.merge([store, if (widget.focus != null) widget.focus!]),
       builder: (context, _) {
-        final titles = ['今日', '全部任务', '已完成', '锁屏', '统计数据'];
+        final titles = ['今日', '全部任务', '锁屏', '已完成', '统计数据'];
         return PopScope(
           canPop: !_selMode,
           onPopInvokedWithResult: (didPop, _) {
@@ -717,7 +717,7 @@ class HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          body: [_todayView, _allView, _doneView, _lockView, _statsView][_tab](),
+          body: [_todayView, _allView, _lockView, _doneView, _statsView][_tab](),
           floatingActionButton: (_tab >= 2 || _selMode)
               ? null
               : FloatingActionButton(onPressed: () => _edit(), tooltip: '新建任务', child: const Icon(Icons.add)),
@@ -731,8 +731,8 @@ class HomePageState extends State<HomePage> {
             destinations: const [
               NavigationDestination(icon: Icon(Icons.today), label: '今日'),
               NavigationDestination(icon: Icon(Icons.calendar_month), label: '全部'),
-              NavigationDestination(icon: Icon(Icons.done_all), label: '已完成'),
               NavigationDestination(icon: Icon(Icons.lock_clock), label: '锁屏'),
+              NavigationDestination(icon: Icon(Icons.done_all), label: '已完成'),
               NavigationDestination(icon: Icon(Icons.bar_chart), label: '统计'),
             ],
           ),
@@ -742,7 +742,7 @@ class HomePageState extends State<HomePage> {
   }
 
   PreferredSizeWidget _selectionBar() {
-    final inDone = _tab == 2;
+    final inDone = _tab == 3;
     return AppBar(
       leading: IconButton(icon: const Icon(Icons.close), tooltip: '退出多选', onPressed: _exitSelection),
       title: Text('已选 ${_sel.length} 项'),

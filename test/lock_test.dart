@@ -190,12 +190,47 @@ void main() {
           .handlePlatformMessage(ScreenPin.channelName, msg, (_) {});
     }
 
-    testWidgets('底栏：今日、全部、已完成、锁屏、统计；标题跟随；统计无 FAB 也无顶栏图表入口', (tester) async {
+    testWidgets('底栏顺序 v1.6.2：锁屏在中间，已完成第四；标题 / FAB / 多选按索引正确', (tester) async {
+      final (store, focus) = await setup(tester);
+      await tester.pumpWidget(MaterialApp(home: HomePage(store: store, focus: focus)));
+      await tester.pump();
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(bar.destinations.length, 5);
+      expect((bar.destinations[2] as NavigationDestination).label, '锁屏');
+      expect((bar.destinations[3] as NavigationDestination).label, '已完成');
+      Future<bool> hasSelect() async {
+        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.pumpAndSettle();
+        final r = find.text('多选').evaluate().isNotEmpty;
+        await tester.tapAt(const Offset(5, 5));
+        await tester.pumpAndSettle();
+        return r;
+      }
+      expect(await hasSelect(), isTrue); // 今日
+      final expectations = {
+        '全部': ('待办 · 全部任务', true, true),
+        '锁屏': ('待办 · 锁屏', false, false),
+        '已完成': ('待办 · 已完成', false, true),
+        '统计': ('待办 · 统计数据', false, false),
+      };
+      for (final e in expectations.entries) {
+        await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(e.key)));
+        await tester.pumpAndSettle();
+        expect(find.text(e.value.$1), findsOneWidget, reason: e.key);
+        expect(find.byType(FloatingActionButton), e.value.$2 ? findsOneWidget : findsNothing, reason: e.key);
+        expect(await hasSelect(), e.value.$3, reason: e.key);
+        expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+            ['今日', '全部', '锁屏', '已完成', '统计'].indexOf(e.key));
+      }
+      expect(find.byKey(const Key('lock_start')), findsNothing);
+    });
+
+    testWidgets('底栏：今日、全部、锁屏、已完成、统计；标题跟随；统计无 FAB 也无顶栏图表入口', (tester) async {
       final (store, focus) = await setup(tester);
       await tester.pumpWidget(MaterialApp(home: HomePage(store: store, focus: focus)));
       await tester.pump();
       final labels = tester.widgetList<NavigationDestination>(find.byType(NavigationDestination)).map((d) => d.label).toList();
-      expect(labels, ['今日', '全部', '已完成', '锁屏', '统计']);
+      expect(labels, ['今日', '全部', '锁屏', '已完成', '统计']);
       expect(find.byKey(const Key('stats_open')), findsNothing);
       expect(find.byType(FloatingActionButton), findsOneWidget);
       await tester.tap(find.text('统计'));
