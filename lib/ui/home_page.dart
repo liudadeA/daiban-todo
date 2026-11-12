@@ -12,9 +12,11 @@ import '../logic/focus.dart';
 import '../logic/estimator.dart';
 import '../logic/planner.dart';
 import '../logic/todo_item.dart';
+import '../platform/pin.dart';
 import 'about.dart';
 import 'category_widgets.dart';
 import 'edit_page.dart';
+import 'lock_page.dart';
 import 'manage_page.dart';
 import 'stats_page.dart';
 import 'timer_page.dart';
@@ -49,6 +51,37 @@ class HomePageState extends State<HomePage> {
 
   List<TodoItem> get _selected => [...store.todo, ...store.done].where((t) => _sel.contains(t.id)).toList();
 
+  final _lockKey = GlobalKey<LockTabState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => resumeFocus());
+  }
+
+  /// 打开 App 时：恢复进程被杀前还在进行的锁屏倒计时（重新请求固定），或提示已到点自动记录的结果。
+  Future<void> resumeFocus() async {
+    final f = widget.focus;
+    if (f == null || !mounted) return;
+    final notice = f.pendingNotice;
+    if (notice != null) {
+      f.pendingNotice = null;
+      _toast(notice, seconds: 5);
+    }
+    if (!f.isCountdown) return;
+    setState(() => _tab = 3);
+    await ScreenPin.setKeepScreenOn(true);
+    await ScreenPin.start();
+    if (!mounted) return;
+    await Navigator.of(context).push(PageRouteBuilder(
+      pageBuilder: (_, _, _) => LockedPage(store: store, focus: f),
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    ));
+  }
+
+  bool get _todoTab => _tab <= 2;
+
   List<TodoItem> _tabItems() {
     final today = store.today;
     switch (_tab) {
@@ -56,8 +89,10 @@ class HomePageState extends State<HomePage> {
         return store.todo.where((t) => Planner.inToday(t, today) || Planner.undatedVisible(t, today)).toList();
       case 1:
         return [...store.todo];
-      default:
+      case 2:
         return [...store.done];
+      default:
+        return [];
     }
   }
 
@@ -417,15 +452,13 @@ class HomePageState extends State<HomePage> {
           child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black45, fontSize: 16))));
 
 
-  Future<void> _openStats() async {
-    final f = widget.focus;
-    if (f == null) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => StatsPage(store: store, focus: f)));
-  }
-
   Future<void> _openTimer(String? cat) async {
     final f = widget.focus;
     if (f == null) return;
+    if (f.isCountdown) {
+      _toast('正在锁屏倒计时「${store.categoryLabel(f.runningCategory)}」');
+      return;
+    }
     if (f.isRunning && f.runningCategory != cat) {
       _toast('正在计时「${store.categoryLabel(f.runningCategory)}」，请先结束或退出');
       return;
@@ -498,6 +531,20 @@ class HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Widget _noFocus() => _empty('计时功能不可用');
+
+  Widget _lockView() {
+    final f = widget.focus;
+    if (f == null) return _noFocus();
+    return LockTab(key: _lockKey, store: store, focus: f);
+  }
+
+  Widget _statsView() {
+    final f = widget.focus;
+    if (f == null) return _noFocus();
+    return StatsPage(store: store, focus: f, embedded: true);
   }
 
   Widget _todayView() {
@@ -628,7 +675,7 @@ class HomePageState extends State<HomePage> {
     return ListenableBuilder(
       listenable: Listenable.merge([store, if (widget.focus != null) widget.focus!]),
       builder: (context, _) {
-        final titles = ['今日', '全部任务', '已完成'];
+        final titles = ['今日', '全部任务', '已完成', '锁屏', '统计数据'];
         return PopScope(
           canPop: !_selMode,
           onPopInvokedWithResult: (didPop, _) {
@@ -638,13 +685,6 @@ class HomePageState extends State<HomePage> {
           appBar: _selMode ? _selectionBar() : AppBar(
             title: Text('待办 · ${titles[_tab]}'),
             actions: [
-              if (widget.focus != null)
-                IconButton(
-                  key: const Key('stats_open'),
-                  tooltip: '统计数据',
-                  icon: const Icon(Icons.bar_chart),
-                  onPressed: _openStats,
-                ),
               PopupMenuButton<String>(
                 onSelected: (v) {
                   switch (v) {
@@ -665,20 +705,20 @@ class HomePageState extends State<HomePage> {
                       showAbout(context);
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'file', child: Text('从文件导入（txt / ics）')),
-                  PopupMenuItem(value: 'paste', child: Text('粘贴文本导入')),
-                  PopupMenuItem(value: 'export', child: Text('导出')),
-                  PopupMenuItem(value: 'select', child: Text('多选')),
-                  PopupMenuItem(value: 'manage', child: Text('批量管理 / 类别')),
-                  PopupMenuItem(value: 'settings', child: Text('设置')),
-                  PopupMenuItem(value: 'about', child: Text('关于')),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'file', child: Text('从文件导入（txt / ics）')),
+                  const PopupMenuItem(value: 'paste', child: Text('粘贴文本导入')),
+                  const PopupMenuItem(value: 'export', child: Text('导出')),
+                  if (_todoTab) const PopupMenuItem(value: 'select', child: Text('多选')),
+                  const PopupMenuItem(value: 'manage', child: Text('批量管理 / 类别')),
+                  const PopupMenuItem(value: 'settings', child: Text('设置')),
+                  const PopupMenuItem(value: 'about', child: Text('关于')),
                 ],
               ),
             ],
           ),
-          body: [_todayView, _allView, _doneView][_tab](),
-          floatingActionButton: (_tab == 2 || _selMode)
+          body: [_todayView, _allView, _doneView, _lockView, _statsView][_tab](),
+          floatingActionButton: (_tab >= 2 || _selMode)
               ? null
               : FloatingActionButton(onPressed: () => _edit(), tooltip: '新建任务', child: const Icon(Icons.add)),
           bottomNavigationBar: NavigationBar(
@@ -692,6 +732,8 @@ class HomePageState extends State<HomePage> {
               NavigationDestination(icon: Icon(Icons.today), label: '今日'),
               NavigationDestination(icon: Icon(Icons.calendar_month), label: '全部'),
               NavigationDestination(icon: Icon(Icons.done_all), label: '已完成'),
+              NavigationDestination(icon: Icon(Icons.lock_clock), label: '锁屏'),
+              NavigationDestination(icon: Icon(Icons.bar_chart), label: '统计'),
             ],
           ),
         ));

@@ -88,22 +88,27 @@ class TimerPageState extends State<TimerPage> {
   Future<void> _finish({required bool interrupted, bool fromSystem = false}) async {
     if (_busy) return;
     _busy = true;
+    final cat = focus.runningCategory;
     FocusSession? rec;
     try {
       rec = await focus.stop(interrupted: interrupted);
-      await ScreenPin.stop();
-      await ScreenPin.setKeepScreenOn(false);
     } catch (_) {}
+    await ScreenPin.stop();
+    await ScreenPin.setKeepScreenOn(false);
     if (!mounted) return;
-    final label = store.categoryLabel(rec?.category ?? focus.runningCategory);
-    final dur = rec == null ? '不足 1 秒，未记入统计' : FocusCalc.fmtDuration(rec.seconds);
-    final msg = rec == null
-        ? dur
-        : (interrupted ? '已中断「$label」的计时并记录（$dur）' : '已记录「$label」的专注（$dur）');
-    if (fromSystem) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已退出屏幕固定，$msg')));
+    final label = store.categoryLabel(cat);
+    final String msg;
+    if (rec == null) {
+      msg = '不足 1 秒，未记入统计';
+    } else if (interrupted) {
+      msg = '已中断「$label」的计时并记录（${FocusCalc.fmtDuration(rec.seconds)}）';
+    } else {
+      msg = '已记录「$label」的专注（${FocusCalc.fmtDuration(rec.seconds)}）';
     }
+    final messenger = ScaffoldMessenger.maybeOf(context);
     Navigator.pop(context, rec);
+    messenger?.clearSnackBars();
+    messenger?.showSnackBar(SnackBar(content: Text(fromSystem ? '已退出屏幕固定，$msg' : msg)));
   }
 
   @override
@@ -151,15 +156,7 @@ class TimerPageState extends State<TimerPage> {
                     child: const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('结束并记录', style: TextStyle(fontSize: 18))),
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _requestExit,
-                  child: const Text('退出并中断'),
-                ),
-                const SizedBox(height: 24),
-                const Text('退出时会先确认，然后解除屏幕固定、中断计时并记入统计。',
-                    textAlign: TextAlign.center, style: TextStyle(color: Colors.black38, fontSize: 12)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
               ],
             ),
           ),
