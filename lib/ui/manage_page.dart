@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../data/focus_store.dart';
 import '../data/store.dart';
 import '../logic/estimator.dart';
 import 'category_widgets.dart';
+import 'timer_page.dart';
 
 /// 批量管理：删除全部、清空已完成、按类别删除 / 重命名。
 class ManagePage extends StatelessWidget {
   final TodoStore store;
-  const ManagePage({super.key, required this.store});
+  final FocusStore? focus;
+  const ManagePage({super.key, required this.store, this.focus});
 
   Future<bool> _confirm(BuildContext context, String title, String body) async {
     final r = await showDialog<bool>(
@@ -38,7 +41,7 @@ class ManagePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([store, if (focus != null) focus!]),
       builder: (context, _) {
         final cats = <String?>[...store.categories, if (store.hasUncategorized) null];
         int todoN(String? c) => store.todo.where((t) => t.category == c).length;
@@ -86,6 +89,21 @@ class ManagePage extends StatelessWidget {
                 isThreeLine: true,
                 subtitle: Text(Estimator.detail(Estimator.forCategory(store.todo, store.done, store.today, c), store.today).join('\n')),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (focus != null)
+                    TextButton(
+                      key: Key('manage_timer_${c ?? ''}'),
+                      onPressed: () async {
+                        final f = focus!;
+                        if (f.isRunning && f.runningCategory != c) {
+                          _toast(context, '正在计时「${store.categoryLabel(f.runningCategory)}」，请先结束或退出');
+                          return;
+                        }
+                        if (!f.isRunning) await f.start(c);
+                        if (!context.mounted) return;
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => TimerPage(store: store, focus: f), fullscreenDialog: true));
+                      },
+                      child: Text(focus!.isRunning && focus!.runningCategory == c ? '继续' : '开始'),
+                    ),
                   IconButton(
                     icon: const Icon(Icons.drive_file_rename_outline),
                     tooltip: '重命名 / 合并到其它类别',

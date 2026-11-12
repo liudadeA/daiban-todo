@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/focus_store.dart';
 import '../data/store.dart';
 import '../logic/dates.dart';
+import '../logic/focus.dart';
 import '../logic/estimator.dart';
 import '../logic/planner.dart';
 import '../logic/todo_item.dart';
@@ -13,11 +16,14 @@ import 'about.dart';
 import 'category_widgets.dart';
 import 'edit_page.dart';
 import 'manage_page.dart';
+import 'stats_page.dart';
+import 'timer_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
   final TodoStore store;
-  const HomePage({super.key, required this.store});
+  final FocusStore? focus;
+  const HomePage({super.key, required this.store, this.focus});
 
   @override
   State<HomePage> createState() => HomePageState();
@@ -410,6 +416,90 @@ class HomePageState extends State<HomePage> {
           padding: const EdgeInsets.all(32),
           child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black45, fontSize: 16))));
 
+
+  Future<void> _openStats() async {
+    final f = widget.focus;
+    if (f == null) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => StatsPage(store: store, focus: f)));
+  }
+
+  Future<void> _openTimer(String? cat) async {
+    final f = widget.focus;
+    if (f == null) return;
+    if (f.isRunning && f.runningCategory != cat) {
+      _toast('正在计时「${store.categoryLabel(f.runningCategory)}」，请先结束或退出');
+      return;
+    }
+    if (!f.isRunning) await f.start(cat);
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => TimerPage(store: store, focus: f), fullscreenDialog: true));
+  }
+
+  List<String?> _timerCategories() {
+    final cats = <String?>[...store.categories];
+    if (store.hasUncategorized) cats.add(null);
+    return cats;
+  }
+
+  Widget _timerGrid() {
+    final f = widget.focus;
+    if (f == null) return const SizedBox.shrink();
+    final cats = _timerCategories();
+    if (cats.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('正向计时', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        GridView.count(
+          key: const Key('timer_grid'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 1.85,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          children: [for (final c in cats) _timerCard(c, f)],
+        ),
+      ]),
+    );
+  }
+
+  Widget _timerCard(String? cat, FocusStore f) {
+    final running = f.isRunning && f.runningCategory == cat;
+    return Card(
+      key: Key('timer_card_${cat ?? ''}'),
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.black.withValues(alpha: 0.06))),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openTimer(cat),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(store.categoryLabel(cat), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+            const Spacer(),
+            Row(children: [
+              Expanded(
+                child: running
+                    ? _LiveClock(seconds: () => f.elapsedSeconds)
+                    : const Text('正向计时', style: TextStyle(color: Colors.black45, fontSize: 12)),
+              ),
+              TextButton(
+                key: Key('timer_start_${cat ?? ''}'),
+                onPressed: () => _openTimer(cat),
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                child: Text(running ? '继续' : '开始'),
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _todayView() {
     final today = store.today;
     final groups = Planner.groupByCategory(store.todo);
@@ -434,6 +524,7 @@ class HomePageState extends State<HomePage> {
         child: Text('${today.month}月${today.day}日 ${Ymd.weekday(today)}　今日剩余 $total 项 · 今日已完成 $doneToday 项',
             style: const TextStyle(color: Colors.black54)),
       ),
+      _timerGrid(),
     ];
     for (final g in rows) {
       final cleared = g.today.isEmpty;
@@ -535,7 +626,7 @@ class HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([store, if (widget.focus != null) widget.focus!]),
       builder: (context, _) {
         final titles = ['今日', '全部任务', '已完成'];
         return PopScope(
@@ -547,6 +638,13 @@ class HomePageState extends State<HomePage> {
           appBar: _selMode ? _selectionBar() : AppBar(
             title: Text('待办 · ${titles[_tab]}'),
             actions: [
+              if (widget.focus != null)
+                IconButton(
+                  key: const Key('stats_open'),
+                  tooltip: '统计数据',
+                  icon: const Icon(Icons.bar_chart),
+                  onPressed: _openStats,
+                ),
               PopupMenuButton<String>(
                 onSelected: (v) {
                   switch (v) {
@@ -559,7 +657,7 @@ class HomePageState extends State<HomePage> {
                     case 'select':
                       setState(() => _selMode = true);
                     case 'manage':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ManagePage(store: store)));
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ManagePage(store: store, focus: widget.focus)));
                     case 'settings':
                       Navigator.push(
                           context, MaterialPageRoute(builder: (_) => SettingsPage(store: store)));
@@ -644,4 +742,33 @@ class _CatGroup {
   final List<TodoItem> undated;
   final bool hasLater;
   _CatGroup(this.cat, this.today, this.undated, this.hasLater);
+}
+
+/// 进行中的正向计时秒表（自己打拍，不依赖父组件每秒重建）。
+class _LiveClock extends StatefulWidget {
+  final int Function() seconds;
+  const _LiveClock({required this.seconds});
+  @override
+  State<_LiveClock> createState() => _LiveClockState();
+}
+
+class _LiveClockState extends State<_LiveClock> {
+  Timer? _t;
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(FocusCalc.fmtClock(widget.seconds()),
+      style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12, fontWeight: FontWeight.w600));
 }

@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/focus_store.dart';
 import 'data/store.dart';
 import 'ui/home_page.dart';
 import 'widget_sync.dart';
@@ -17,15 +18,18 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final dir = await getApplicationDocumentsDirectory();
   final store = TodoStore(dir: dir, prefs: prefs);
+  final focus = FocusStore(dir: dir, prefs: prefs);
   store.onPersisted = () => syncTodayWidget(store);
   await HomeWidget.registerInteractivityCallback(widgetBackgroundCallback);
   await store.load();
-  runApp(DaibanApp(store: store));
+  await focus.load();
+  runApp(DaibanApp(store: store, focus: focus));
 }
 
 class DaibanApp extends StatefulWidget {
   final TodoStore store;
-  const DaibanApp({super.key, required this.store});
+  final FocusStore focus;
+  const DaibanApp({super.key, required this.store, required this.focus});
 
   @override
   State<DaibanApp> createState() => _DaibanAppState();
@@ -102,7 +106,7 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D6B)),
         useMaterial3: true,
       ),
-      home: HomePage(key: _homeKey, store: widget.store),
+      home: HomePage(key: _homeKey, store: widget.store, focus: widget.focus),
     );
   }
 }
