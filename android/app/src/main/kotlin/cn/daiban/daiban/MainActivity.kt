@@ -1,14 +1,17 @@
 package cn.daiban.daiban
 
 import android.app.ActivityManager
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 /** 接收「分享 / 用…打开」的 todo.txt 文本，并交给 Flutter 导入；屏幕固定与分享走 daiban/pin。 */
 class MainActivity : FlutterActivity() {
@@ -76,14 +79,31 @@ class MainActivity : FlutterActivity() {
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     result.success(null)
                 }
-                "share" -> {
-                    val text = (call.arguments as? Map<*, *>)?.get("text") as? String ?: ""
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, text)
+                "shareImage" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val path = args?.get("path") as? String
+                    val title = args?.get("title") as? String ?: "分享"
+                    try {
+                        val file = File(path ?: "")
+                        val shareDir = File(cacheDir, "share").canonicalPath
+                        if (path == null || !file.isFile || !file.canonicalPath.startsWith(shareDir + File.separator)) {
+                            result.error("bad_path", "分享图片不存在", null)
+                        } else {
+                            val uri = FileProvider.getUriForFile(this, "$packageName.shareprovider", file)
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "image/png"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                clipData = ClipData.newRawUri(file.name, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            startActivity(Intent.createChooser(send, title).apply {
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            })
+                            result.success(null)
+                        }
+                    } catch (e: Exception) {
+                        result.error("share_failed", e.message, null)
                     }
-                    startActivity(Intent.createChooser(send, "分享"))
-                    result.success(null)
                 }
                 else -> result.notImplemented()
             }

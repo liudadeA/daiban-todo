@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 只开放缓存目录下的 share/，用于分享统计图片 -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>
