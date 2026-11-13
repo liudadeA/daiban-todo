@@ -208,10 +208,10 @@ void main() {
       }
       expect(await hasSelect(), isTrue); // 今日
       final expectations = {
-        '全部': ('待办 · 全部任务', true, true),
-        '锁屏': ('待办 · 锁屏', false, false),
-        '已完成': ('待办 · 已完成', false, true),
-        '统计': ('待办 · 统计数据', false, false),
+        '全部': ('待办 专注版 · 全部任务', true, true),
+        '锁屏': ('待办 专注版 · 锁屏', false, false),
+        '已完成': ('待办 专注版 · 已完成', false, true),
+        '统计': ('待办 专注版 · 统计数据', false, false),
       };
       for (final e in expectations.entries) {
         await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(e.key)));
@@ -235,12 +235,12 @@ void main() {
       expect(find.byType(FloatingActionButton), findsOneWidget);
       await tester.tap(find.text('统计'));
       await tester.pumpAndSettle();
-      expect(find.text('待办 · 统计数据'), findsOneWidget);
+      expect(find.text('待办 专注版 · 统计数据'), findsOneWidget);
       expect(find.text('累计专注'), findsOneWidget);
       expect(find.byType(FloatingActionButton), findsNothing);
       await tester.tap(find.text('锁屏'));
       await tester.pumpAndSettle();
-      expect(find.text('待办 · 锁屏'), findsOneWidget);
+      expect(find.text('待办 专注版 · 锁屏'), findsOneWidget);
       expect(find.byKey(const Key('lock_start')), findsOneWidget);
       for (final m in [25, 45, 60, 90]) {
         expect(find.byKey(Key('lock_min_$m')), findsOneWidget);

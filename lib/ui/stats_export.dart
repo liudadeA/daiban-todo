@@ -142,7 +142,7 @@ class StatsExportPainter {
     // 页眉
     const headH = 72.0;
     sections['header'] = const Rect.fromLTWH(0, 0, width, headH);
-    _text(c, '待办 · 专注统计', pad, 16, 20, color: cs.onPrimary, w: FontWeight.w700);
+    _text(c, '待办 专注版 · 专注统计', pad, 16, 20, color: cs.onPrimary, w: FontWeight.w700);
     _text(c, '生成于 ${Ymd.fmt(d.generatedOn)}', pad, 44, 12, color: cs.onPrimary.withValues(alpha: 0.85));
     y = headH + 12;
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">在桌面上查看并勾选今日待办，不用打开应用</string>
-    <string name="widget_title">待办 · 今日</string>
+    <string name="widget_title">待办 专注版 · 今日</string>
     <string name="widget_empty_done">今日已完成 🎉</string>
     <string name="widget_empty_none">今日暂无任务</string>
     <string name="widget_loading">加载中…</string>
