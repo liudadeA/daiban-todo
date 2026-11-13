@@ -7,7 +7,7 @@ on:
       tag:
         description: 'Release 标签，例如 v1.5.1'
         required: true
-        default: 'v1.5.1'
+        default: 'v1.5.2'
   push:
     tags: ['v*']
 
@@ -41,17 +41,18 @@ jobs:
         run: |
           VER=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/daiban-arm64-v${VER}.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/daiban-armeabi-v7a-v${VER}.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/daiban-basic-arm64-v${VER}.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/daiban-basic-armeabi-v7a-v${VER}.apk
           ls -l dist
       - name: 发布 Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          NOTES="待办 ${TAG}：兼容 topydo / todo.txt 的安卓待办。arm64-v8a（绝大多数手机）装 arm64 包；老设备装 armeabi-v7a 包。调试证书签名，需允许安装未知来源应用。"
+          NOTES="待办 基础版 ${TAG}：兼容 todo.txt / topydo 的任务管理，含类别、提前/顺延、桌面组件、按任务量预计完成日期、导入导出；不含正向计时、锁屏或统计。基础版包名 cn.daiban.daiban.basic，专注版包名 cn.daiban.daiban，两版可同时安装，数据独立。专注版可覆盖更新原 v1.6.3；新基础版需手动导入原有任务。arm64-v8a（绝大多数手机）选 arm64；老设备选 armeabi-v7a。调试证书签名，需允许安装未知来源应用。基础版：https://github.com/liudadeA/daiban-todo/releases/tag/v1.5.2 ；专注版：https://github.com/liudadeA/daiban-todo/releases/tag/v1.6.4"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.apk --clobber
+            echo "Release already exists; refusing to overwrite assets"
+            exit 1
           else
-            gh release create "$TAG" dist/*.apk --target "${{ github.sha }}" --title "待办 ${TAG}" --notes "$NOTES"
+            gh release create "$TAG" dist/*.apk --target "${{ github.sha }}" --title "待办 基础版 ${TAG}" --notes "$NOTES" --latest=false
           fi

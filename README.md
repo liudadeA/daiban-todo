@@ -1,4 +1,6 @@
-# 待办 (daiban-todo)
+# 待办 基础版 (daiban-todo)
+
+本分支为**基础版**。基础版（`cn.daiban.daiban.basic`）不含计时功能，专注版（`cn.daiban.daiban`）含正向计时、锁屏与统计；两版包名不同，可以同时安装，数据各自独立。旧版基础版 v1.5.1 与专注版曾共用包名，新基础版不会自动继承旧包的数据，请先导出再导入。
 
 兼容 [topydo](https://github.com/topydo/topydo) / [todo.txt](http://todotxt.org) 格式的安卓待办清单（Flutter），为“按计划备考、没做完自动顺延、做完自动提前”而做。
 
