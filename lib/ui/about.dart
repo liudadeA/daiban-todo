@@ -20,7 +20,7 @@ const importFormatExplain = '''各部分含义：
 • @情境 —— 可选的情境标签
 • .ics 日历文件也可以导入：每天的事件会自动拆成“一项一条”的任务，导出时也能生成 .ics''';
 
-const introText = '''待办 是一款兼容 todo.txt 格式的安卓待办清单：按类别自动顺延未完成的任务、做完后自动提前后续任务。
+const introText = '''待办 基础版 是一款兼容 todo.txt 格式的安卓待办清单：按类别自动顺延未完成的任务、做完后自动提前后续任务。
 
 本作是为了借助 AI 更高效地做计划：把学习资料、目录或需求交给 AI，让它按本应用的导入格式生成计划，再一键导入（支持 txt / ics）。导入之后，应用负责按日期展示，未完成的任务自动顺延，完成后同一类别的后续任务自动提前。
 
@@ -50,7 +50,7 @@ class AboutPage extends StatelessWidget {
           child: Text(t, style: th.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         );
     return Scaffold(
-      appBar: AppBar(title: const Text('关于 待办')),
+      appBar: AppBar(title: const Text('关于 待办 基础版')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),

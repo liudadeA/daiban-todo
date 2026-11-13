@@ -87,7 +87,7 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '待办',
+      title: '待办 基础版',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: messengerKey,
       navigatorKey: navigatorKey,

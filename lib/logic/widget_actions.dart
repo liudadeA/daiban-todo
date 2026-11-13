@@ -84,7 +84,7 @@ class WidgetActions {
   }
 
   /// 处理后台回调：先按设置做跨日顺延，再按 URI 勾选完成（含按类别提前）。
-  /// [uri] 形如 `daiban://complete?id=…` 或 `daiban://refresh`。
+  /// [uri] 形如 `daiban-basic://complete?id=…` 或 `daiban-basic://refresh`。
   static Future<String?> handle(TodoStore store, Uri? uri) async {
     await store.checkDayChange();
     if (uri == null) return null;
