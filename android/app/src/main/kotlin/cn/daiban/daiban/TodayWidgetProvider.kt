@@ -77,14 +77,14 @@ class TodayWidgetProvider : HomeWidgetProvider() {
         }
         scheduleMidnight(context)
         if (needsDartRefresh(widgetData, today)) {
-            startBackground(context, "daiban://refresh")
+            startBackground(context, "daiban-basic://refresh")
         }
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         scheduleMidnight(context)
-        startBackground(context, "daiban://refresh")
+        startBackground(context, "daiban-basic://refresh")
     }
 
     override fun onDisabled(context: Context) {
@@ -97,13 +97,13 @@ class TodayWidgetProvider : HomeWidgetProvider() {
             ACTION_COMPLETE -> {
                 val id = intent.getStringExtra(EXTRA_TASK_ID)
                 if (!id.isNullOrEmpty()) {
-                    startBackground(context, "daiban://complete?id=${Uri.encode(id)}")
+                    startBackground(context, "daiban-basic://complete?id=${Uri.encode(id)}")
                 }
             }
             ACTION_MIDNIGHT, Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_DATE_CHANGED -> {
                 scheduleMidnight(context)
-                startBackground(context, "daiban://refresh")
+                startBackground(context, "daiban-basic://refresh")
                 requestUpdate(context)
             }
             else -> super.onReceive(context, intent)
@@ -111,8 +111,8 @@ class TodayWidgetProvider : HomeWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_COMPLETE = "cn.daiban.daiban.widget.COMPLETE"
-        const val ACTION_MIDNIGHT = "cn.daiban.daiban.widget.MIDNIGHT"
+        const val ACTION_COMPLETE = "cn.daiban.daiban.basic.widget.COMPLETE"
+        const val ACTION_MIDNIGHT = "cn.daiban.daiban.basic.widget.MIDNIGHT"
         const val EXTRA_TASK_ID = "task_id"
         const val KEY_TODAY_JSON = "today_json"
         const val KEY_RENDER_JSON = "today_render_json"

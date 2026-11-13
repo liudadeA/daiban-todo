@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
-        android:label="待办"
+        android:label="待办 基础版"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -62,8 +62,8 @@
             android:label="@string/widget_title">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="cn.daiban.daiban.widget.COMPLETE" />
-                <action android:name="cn.daiban.daiban.widget.MIDNIGHT" />
+                <action android:name="cn.daiban.daiban.basic.widget.COMPLETE" />
+                <action android:name="cn.daiban.daiban.basic.widget.MIDNIGHT" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.TIME_CHANGED" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
