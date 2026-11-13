@@ -97,7 +97,7 @@ void main() {
       expect(p.sections['pie']!.bottom, lessThan(p.sections['bar']!.top));
       expect(p.sections['pieChart']!.height, greaterThan(100));
       expect(p.sections['barChart']!.height, greaterThan(80));
-      expect(p.texts, contains('待办 · 专注统计'));
+      expect(p.texts, contains('待办 专注版 · 专注统计'));
       expect(p.texts, contains('专注时长分布'));
       expect(p.texts, contains('本月专注时段分布'));
       expect(p.texts, contains('按日 · 2026-11-12'));
