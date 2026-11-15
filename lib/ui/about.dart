@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/app_update.dart';
+import 'update_widgets.dart';
+
 const repoUrl = 'https://github.com/liudadeA/daiban-todo';
 
 /// 示例任务行（可复制）。
@@ -39,7 +42,8 @@ Future<void> _copy(BuildContext context, String text) async {
 }
 
 class AboutPage extends StatelessWidget {
-  const AboutPage({super.key});
+  final UpdateCoordinator? updateCoordinator;
+  const AboutPage({super.key, this.updateCoordinator});
 
   @override
   Widget build(BuildContext context) {
@@ -52,9 +56,12 @@ class AboutPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('关于 待办 基础版')),
       body: SafeArea(
-        child: ListView(
+        child: SingleChildScrollView(
+          key: const Key('aboutScroll'),
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             // 1. 导入格式（置顶）
             h('导入格式'),
             const SelectableText(importFormatText),
@@ -92,6 +99,8 @@ class AboutPage extends StatelessWidget {
             // 2. 简介
             h('简介'),
             const SelectableText(introText, key: Key('introText'), style: TextStyle(height: 1.5)),
+            h('版本与更新'),
+            UpdateAboutSection(coordinator: updateCoordinator),
             // 3. 协议（置于最后，只保留本仓库链接）
             h('开源协议'),
             const SelectableText(licenseText, key: Key('licenseText'), style: TextStyle(height: 1.5)),
@@ -106,6 +115,7 @@ class AboutPage extends StatelessWidget {
               ),
             ]),
           ],
+          ),
         ),
       ),
     );

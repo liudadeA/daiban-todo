@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:daiban/logic/app_edition.dart';
 import 'package:daiban/ui/about.dart';
 
 void main() {
@@ -8,10 +9,17 @@ void main() {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(gradle, contains('applicationId = "cn.daiban.daiban.basic"'));
     expect(gradle, contains('namespace = "cn.daiban.daiban"'));
-    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.4+11'));
+    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.5+12'));
     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     expect(manifest, contains('android:label="待办 基础版"'));
     expect(File('lib/main.dart').readAsStringSync(), contains("title: '待办 基础版'"));
+    expect(AppEdition.profile, EditionProfile.basic);
+    expect(AppEdition.versionName, '1.5.5');
+    expect(AppEdition.pubspecBuild, 12);
+    expect(manifest, contains('android.permission.INTERNET'));
+    expect(manifest, contains('android.permission.REQUEST_INSTALL_PACKAGES'));
+    expect(manifest, contains(r'${applicationId}.shareprovider'));
+    expect(File('android/app/src/main/res/xml/share_paths.xml').readAsStringSync(), contains('updates/'));
   });
 
   test('桌面组件动作与 URI 使用本版独立标识', () {
