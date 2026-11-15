@@ -192,8 +192,10 @@ class TodayWidgetProvider : HomeWidgetProvider() {
                 val o = open.optJSONObject(i) ?: continue
                 val date = if (o.isNull("date")) null else o.optString("date").ifBlank { null }
                 val start = if (o.isNull("start")) null else o.optString("start").ifBlank { null }
-                val visible = start == null || start <= today
-                val inToday = visible && date != null && date <= today
+                val displayDate = if (o.isNull("displayDate")) date else o.optString("displayDate").ifBlank { date }
+                val early = displayDate != null && date != null && displayDate < date && displayDate <= today
+                val visible = early || start == null || start <= today
+                val inToday = visible && displayDate != null && displayDate <= today
                 val undated = visible && date == null
                 if (!inToday && !undated) continue
                 val cat = o.optString("category").ifBlank { "未分类" }

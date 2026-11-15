@@ -31,7 +31,7 @@ void main() {
     expect(find.text('做试卷 2'), findsOneWidget);
     await tester.tap(find.text('全部'));
     await tester.pump();
-    expect(find.textContaining('今天'), findsWidgets);
+    expect(find.text('提前显示 · 日期不变'), findsWidgets);
     await tester.tap(find.text('已完成'));
     await tester.pump();
     expect(find.text('做试卷 1'), findsOneWidget);

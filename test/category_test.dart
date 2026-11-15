@@ -79,7 +79,7 @@ void main() {
       expect(await store.complete(find('408 A1')), isNull); // 还剩 A2
       final msg = await store.complete(find('408 A2'));
       expect(msg, '408 今日任务已完成，已提前下一批');
-      expect(dueOf(store, '408'), ['2026-11-11', '2026-11-12']); // B→今天，C→明天
+      expect(dueOf(store, '408'), ['2026-11-12', '2026-11-13']); // B→今天，C→明天
       expect(dueOf(store, '数学'), ['2026-11-11', '2026-11-12']); // 未动
       expect(Ymd.fmt(find('杂事 明天').due!), '2026-11-12');
       expect(Planner.todaySet(store.todo, store.today).where((t) => t.category == '数学').length, 1);
@@ -90,14 +90,14 @@ void main() {
       await store.complete(find('408 A2'));
       final msg = await store.complete(find('数学 A'));
       expect(msg, '数学 今日任务已完成，已提前下一批');
-      expect(dueOf(store, '数学'), ['2026-11-11']);
-      expect(dueOf(store, '408'), ['2026-11-11', '2026-11-12']); // 没有被数学的提前再次移动
+      expect(dueOf(store, '数学'), ['2026-11-12']);
+      expect(dueOf(store, '408'), ['2026-11-12', '2026-11-13']); // 没有被数学的提前再次移动
     });
 
     test('未分类自成一组', () async {
       final msg = await store.complete(find('杂事 今天'));
       expect(msg, '今日任务已完成，已提前下一批');
-      expect(Ymd.fmt(find('杂事 明天').due!), '2026-11-11');
+      expect(Ymd.fmt(find('杂事 明天').due!), '2026-11-12');
       expect(dueOf(store, '408').first, '2026-11-11');
       expect(dueOf(store, '408').last, '2026-11-13');
     });
@@ -115,8 +115,8 @@ void main() {
 
     test('手动“提前下一批”按类别，只动该类别', () async {
       final msg = await store.pullNextBatch('数学');
-      expect(msg, '数学 已把 11月12日 的任务提前到今天');
-      expect(dueOf(store, '数学'), ['2026-11-11', '2026-11-11']);
+      expect(msg, '数学 已把 11月12日 的任务提前显示到今天');
+      expect(dueOf(store, '数学'), ['2026-11-11', '2026-11-12']);
       expect(dueOf(store, '408'), ['2026-11-11', '2026-11-11', '2026-11-12', '2026-11-13']);
       expect(await store.pullNextBatch('不存在'), '不存在 没有可提前的后续任务');
     });
@@ -125,8 +125,8 @@ void main() {
       final msg = await store.completeMany([find('408 A1'), find('408 A2'), find('数学 A')]);
       expect(msg, contains('408 今日任务已完成'));
       expect(msg, contains('数学 今日任务已完成'));
-      expect(dueOf(store, '408'), ['2026-11-11', '2026-11-12']);
-      expect(dueOf(store, '数学'), ['2026-11-11']);
+      expect(dueOf(store, '408'), ['2026-11-12', '2026-11-13']);
+      expect(dueOf(store, '数学'), ['2026-11-12']);
     });
   });
 
@@ -253,7 +253,7 @@ void main() {
       p2.applyCategory('数学');
       await s.applyImport(p2, replace: false);
       await s.complete(s.todo.firstWhere((t) => t.text == '408 一'));
-      expect(dueOf(s, '408'), ['2026-11-11']);
+      expect(dueOf(s, '408'), ['2026-11-12']);
       expect(dueOf(s, '数学'), ['2026-11-11', '2026-11-12']);
     });
     test('编辑页：更改类别 / 变为未分类', () async {

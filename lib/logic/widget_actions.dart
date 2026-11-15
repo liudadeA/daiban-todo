@@ -6,7 +6,7 @@ import 'todo_item.dart';
 /// 桌面组件用的纯 Dart 逻辑：构造今日任务快照，以及处理后台勾选 / 刷新。
 /// 不依赖 home_widget，便于在 VM 上单测，并与应用内的完成 / 提前语义保持一致。
 class WidgetActions {
-  static const scheme = 'daiban';
+  static const scheme = 'daiban-basic';
 
   /// 由任务行内容算出的稳定短 ID（FNV-1a 64），用于组件勾选时找回同一条任务。
   static String idOf(TodoItem t) {
@@ -73,6 +73,7 @@ class WidgetActions {
           'category': store.categoryLabel(t.category),
           'date': t.date == null ? null : Ymd.fmt(t.date!),
           'start': t.start == null ? null : Ymd.fmt(t.start!),
+          'displayDate': t.displayDate == null ? null : Ymd.fmt(t.displayDate!),
         }
     ];
     return {

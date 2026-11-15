@@ -8,7 +8,7 @@ void main() {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(gradle, contains('applicationId = "cn.daiban.daiban.basic"'));
     expect(gradle, contains('namespace = "cn.daiban.daiban"'));
-    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.2+9'));
+    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.3+10'));
     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     expect(manifest, contains('android:label="待办 基础版"'));
     expect(File('lib/main.dart').readAsStringSync(), contains("title: '待办 基础版'"));
@@ -22,6 +22,7 @@ void main() {
       expect(provider, contains(action));
     }
     expect(provider, contains('daiban-basic://refresh'));
+    expect(File('lib/logic/widget_actions.dart').readAsStringSync(), contains("scheme = 'daiban-basic'"));
     expect(provider, contains('daiban-basic://complete'));
     expect(File('android/app/src/main/res/values/strings.xml').readAsStringSync(), contains('待办 基础版 · 今日'));
   });
