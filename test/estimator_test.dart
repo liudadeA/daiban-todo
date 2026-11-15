@@ -203,15 +203,15 @@ void main() {
       expect(s.todo.length, 2);
     });
 
-    test('完成即提前改写 due/t，plan: 不变；预计 = 按原计划的量', () async {
+    test('完成即提前只改显示不改 due/t，plan: 不变；预计 = 按原计划的量', () async {
       await s.applyImport(
           s.preview('甲 +408 due:2026-11-11\n乙 +408 due:2026-11-12\n丙 +408 due:2026-11-14\n'),
           replace: true);
       await s.complete(s.todo.firstWhere((t) => t.text == '甲'));
       final b = s.todo.firstWhere((t) => t.text == '乙');
       final c = s.todo.firstWhere((t) => t.text == '丙');
-      expect(f(b.date), '2026-11-11'); // 被提前到今天
-      expect(f(c.date), '2026-11-13');
+      expect(f(b.date), '2026-11-12'); // 被提前到今天
+      expect(f(c.date), '2026-11-14');
       expect(planOf('乙'), '2026-11-12'); // 原计划不变
       expect(planOf('丙'), '2026-11-14');
       var e = Estimator.forCategory(s.todo, s.done, s.today, '408');

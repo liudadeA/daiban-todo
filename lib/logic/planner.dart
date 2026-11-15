@@ -5,11 +5,11 @@ import 'todo_item.dart';
 class Planner {
   /// 未完成且（没有开始日期 或 开始日期 <= [day]）
   static bool visibleOn(TodoItem t, DateTime day) =>
-      !t.done && (t.start == null || !t.start!.isAfter(day));
+      !t.done && (t.visibleEarlyOn(day) || t.start == null || !t.start!.isAfter(day));
 
   /// “今日任务”：可见 且 有日期 且 日期 <= 今天（含逾期）
   static bool inToday(TodoItem t, DateTime today) {
-    final d = t.date;
+    final d = t.displayDate;
     return visibleOn(t, today) && d != null && !d.isAfter(today);
   }
 
@@ -48,29 +48,22 @@ class Planner {
     return shifted;
   }
 
-  /// “完成即提前”：如果今日任务（今天 + 逾期）已全部完成，
-  /// 找到下一个日期批次 N，把日期 >= N 的所有未完成任务 due/t 各 -(N - 今天) 天，
-  /// 使下一批出现在今天。返回提前的天数（0 表示没有变化）。
-  /// [force] 为 true 时（手动“提前下一批”）即使今天还有未完成任务也提前。
+  /// 只让下一日期批次提前显示，保留所有任务的 due/t 和后续批次日期。
+  /// 返回显示提前的间隔；force 允许今日尚未清空时手动再显示一批。
   static int pullForward(List<TodoItem> items, DateTime today, {bool force = false}) {
-    final todayEmpty = !items.any((t) => inToday(t, today));
-    if (!force && !todayEmpty) return 0;
+    for (final t in items) { t.migrateLegacyPulls(); }
+    if (!force && items.any((t) => inToday(t, today))) return 0;
     DateTime? next;
     for (final t in items) {
       final d = t.date;
-      if (t.done || d == null || !d.isAfter(today)) continue;
+      if (t.done || d == null || !d.isAfter(today) || inToday(t, today)) continue;
       if (next == null || d.isBefore(next)) next = d;
     }
     if (next == null) return 0;
     final gap = Ymd.diff(next, today);
-    // 今日已清空时的提前才记录（可由“取消完成”还原）；今天还有任务时的手动强制提前不记录。
-    final seq = todayEmpty ? _nextSeq(items, today) : null;
+    final seq = _nextSeq(items, today);
     for (final t in items) {
-      final d = t.date;
-      if (!t.done && d != null && !d.isBefore(next)) {
-        t.shift(-gap);
-        if (seq != null) t.addPull(today, seq, gap);
-      }
+      if (!t.done && t.date == next && !inToday(t, today)) t.addPull(today, seq, gap);
     }
     return gap;
   }
@@ -85,34 +78,22 @@ class Planner {
     return m + 1;
   }
 
-  /// 还原“完成即提前”：只要今天的任务里同时存在“原本就是今天的未完成任务”（没有今日提前记录）
-  /// 和“被提前过来的任务”，就把最近一次提前整体还原（被平移的任务各自回到原日期），
-  /// 必要时连续还原多次，直到今日里不再同时有两种任务。返回还原的次数。
-  /// 只处理 [category]（null = 未分类）的任务，只还原今天做的提前。
+  /// 取消完成后，撤回同类中更晚批次的“提前显示”，不修改任何任务日期。
+  /// 已提前完成又取消的任务保留自身 pv，作为锚点；只撤回其后的批次。
   static int revertPulls(List<TodoItem> items, DateTime today, String? category) {
-    var n = 0;
-    for (var guard = 0; guard < 50; guard++) {
-      final group = items.where((t) => !t.done && t.category == category).toList();
-      final todays = group.where((t) => inToday(t, today)).toList();
-      final hasOriginal = todays.any((t) => !t.pulledOn(today));
-      final hasPulled = todays.any((t) => t.pulledOn(today));
-      if (!hasOriginal || !hasPulled) break;
-      var latest = 0;
-      for (final t in group) {
-        final l = t.pulls;
-        if (l.isNotEmpty && l.last.day == today && l.last.seq > latest) latest = l.last.seq;
+    final group = items.where((t) => !t.done && t.category == category).toList();
+    for (final t in group) { t.migrateLegacyPulls(); }
+    final todays = group.where((t) => inToday(t, today)).toList();
+    if (todays.isEmpty) return 0;
+    int batch(TodoItem t) => t.pulledOn(today) ? t.pulls.last.seq : 0;
+    final earliest = todays.map(batch).reduce((a, b) => a < b ? a : b);
+    final removed = <int>{};
+    for (final t in group) {
+      while (t.pulledOn(today) && t.pulls.last.seq > earliest) {
+        removed.add(t.popPull()!.seq);
       }
-      if (latest == 0) break;
-      for (final t in group) {
-        final l = t.pulls;
-        if (l.isNotEmpty && l.last.day == today && l.last.seq == latest) {
-          final r = t.popPull()!;
-          t.shift(r.gap);
-        }
-      }
-      n++;
     }
-    return n;
+    return removed.length;
   }
 
   /// 按类别分组（保持原顺序）。key 为 null 表示“未分类”。

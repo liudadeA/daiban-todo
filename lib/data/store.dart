@@ -167,6 +167,7 @@ class TodoStore extends ChangeNotifier {
     var changed = false;
     for (final t in [...todo, ...done]) {
       if (t.ensurePlan()) changed = true;
+      if (t.migrateLegacyPulls()) changed = true;
     }
     return changed;
   }
@@ -219,9 +220,6 @@ class TodoStore extends ChangeNotifier {
     }
     String? msg;
     _pushUndo();
-    for (final i in todo) {
-      i.dropPullsBefore(t); // 提前记录只在当天有效
-    }
     final moved = Planner.shiftBackByCategory(todo, last, t, enabled: shiftEnabledFor);
     if (moved.isNotEmpty) {
       final parts = moved.entries.map((e) => '${categoryLabel(e.key)} ${e.value} 天').join('、');
@@ -257,6 +255,7 @@ class TodoStore extends ChangeNotifier {
     if (parsed == null) return;
     _pushUndo();
     final oldDate = item.date, oldPlan = item.plan;
+    final oldDue = item.due, oldStart = item.start, oldPulls = [...item.pulls];
     item.tokens = parsed.tokens;
     // 编辑页里类别单独编辑：正文中不含类别标签，这里把它放回第一个 +标签
     item.setCategory(category);
@@ -265,6 +264,9 @@ class TodoStore extends ChangeNotifier {
     item.start = start;
     // 日期没改就保留原计划日期；用户手动改了日期则视为重新计划
     if (oldPlan != null && item.date == oldDate) item.plan = oldPlan;
+    if (item.due == oldDue && item.start == oldStart) {
+      for (final r in oldPulls) { item.addPull(r.day, r.seq, r.gap); }
+    }
     await _save();
   }
 
@@ -301,7 +303,7 @@ class TodoStore extends ChangeNotifier {
     final msgs = <String>[];
     for (final c in cats) {
       if (!pullEnabledFor(c)) continue;
-      final gap = Planner.pullForwardCategory(todo, t, c);
+      final gap = Planner.pullForwardCategory([...todo, ...done], t, c);
       if (gap > 0) msgs.add(c == null ? '今日任务已完成，已提前下一批' : '$c 今日任务已完成，已提前下一批');
     }
     await _save();
@@ -309,7 +311,7 @@ class TodoStore extends ChangeNotifier {
   }
 
   /// 在已完成列表里取消完成，回到待办。若该类别刚刚“完成即提前”过、现在今天又有了原本的未完成任务，
-  /// 就把提前的那一批还原回原日期（只显示今天的）。返回提示消息（无则 null）。
+  /// 就撤回后续批次的提前显示（计划日期始终不变）。返回提示消息（无则 null）。
   Future<String?> reopen(TodoItem item) => reopenMany([item]);
 
   // ---------------------------------------------------------------- 导入 / 导出
@@ -357,21 +359,21 @@ class TodoStore extends ChangeNotifier {
     return skipped;
   }
 
-  /// 手动“提前下一批”：把 [category]（null = 未分类）的下一个日期批次整体提前到今天，
-  /// 不受自动开关和“今日是否清空”限制；只移动该类别的任务。
+  /// 手动“提前下一批”：让 [category]（null = 未分类）的下一批提前显示，due/t 不变，
+  /// 不受自动开关和“今日是否清空”限制；只提前显示该类别的下一批任务。
   Future<String> pullNextBatch([String? category]) async {
     final t = today;
     DateTime? next;
     for (final i in todo) {
       final d = i.date;
-      if (i.category == category && d != null && d.isAfter(t) && (next == null || d.isBefore(next))) next = d;
+      if (i.category == category && !Planner.inToday(i, t) && d != null && d.isAfter(t) && (next == null || d.isBefore(next))) next = d;
     }
     final label = category == null ? '' : '$category ';
     if (next == null) return '$label没有可提前的后续任务';
     _pushUndo();
-    final gap = Planner.pullForwardCategory(todo, t, category, force: true);
+    final gap = Planner.pullForwardCategory([...todo, ...done], t, category, force: true);
     await _save();
-    return gap > 0 ? '$label已把 ${next.month}月${next.day}日 的任务提前到今天' : '$label没有可提前的后续任务';
+    return gap > 0 ? '$label已把 ${next.month}月${next.day}日 的任务提前显示到今天' : '$label没有可提前的后续任务';
   }
 
   // ---------------------------------------------------------------- 批量管理
@@ -430,6 +432,7 @@ class TodoStore extends ChangeNotifier {
     for (final i in list) {
       i.ensurePlan();
       final p = i.plan;
+      i.clearPulls();
       i.shift(days);
       // 手动批量平移视为重新计划：原计划日期跟着移动
       if (p != null) i.plan = Ymd.add(p, days);

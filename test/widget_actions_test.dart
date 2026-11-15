@@ -70,7 +70,7 @@ void main() {
     final msg2 = await WidgetActions.handle(store, WidgetActions.completeUri(WidgetActions.idOf(b)));
     expect(msg2, contains('408 今日任务已完成，已提前下一批'));
     final next = store.todo.firstWhere((t) => t.text == '下一批');
-    expect(Ymd.fmt(next.due!), '2026-11-11');
+    expect(Ymd.fmt(next.due!), '2026-11-13');
     // 数学未完成，不能被 408 的提前带走
     final mathLater = store.todo.firstWhere((t) => t.text == '数学以后');
     expect(Ymd.fmt(mathLater.due!), '2026-11-13');

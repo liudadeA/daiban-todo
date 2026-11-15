@@ -383,7 +383,7 @@ class HomePageState extends State<HomePage> {
               color: (c ?? Colors.blueGrey).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
           child: Text(s, style: TextStyle(fontSize: 12, color: c ?? Colors.blueGrey.shade700)),
         );
-    if (!doneTile && t.pulledOn(today)) chips.add(chip('已提前到今日', c: Colors.teal));
+    if (!doneTile && t.visibleEarlyOn(today)) chips.add(chip('提前显示 · 日期不变', c: Colors.teal));
     if (t.due != null) chips.add(chip('截止 ${Ymd.chipLabel(t.due!, today)}', c: overdue ? Colors.red : null));
     if (t.start != null) chips.add(chip('开始 ${Ymd.chipLabel(t.start!, today)}', c: Colors.teal));
     if (doneTile && t.completionDate != null) {

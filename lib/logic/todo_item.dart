@@ -3,7 +3,7 @@ import 'dates.dart';
 /// 一条 todo.txt 任务。语义参考 topydo / todo.txt 规范：
 ///   [x 完成日期] [(A)] [创建日期] 文本 +项目 @情境 key:value ...
 /// 其中 due:YYYY-MM-DD 为截止日期，t:YYYY-MM-DD 为开始日期（未到开始日期不在“今日”显示）。
-/// 一次“完成即提前”的记录：哪天、第几次（同一天内递增）、提前了几天。
+/// 一次提前显示记录：哪天、第几批、相对计划日期提前几天。
 class PullRecord {
   final DateTime day;
   final int seq;
@@ -175,7 +175,7 @@ class TodoItem {
 
   // ------------------------------------------------ 原计划日期（隐藏标签 plan:）
   //
-  // “完成即提前 / 整体顺延”会改写 due/t，所以另外用 plan:YYYY-MM-DD 记住每条任务最初计划的日期，
+  // 整体顺延仍会改写 due/t；完成即提前只写 pv。用 plan:YYYY-MM-DD 保留原计划日期，
   // 预计完成时间按它来算。标签不在界面中显示；完成后保留（已完成的计划日也要计入）。
 
   /// 原计划日期标签（没有则 null）
@@ -189,7 +189,7 @@ class TodoItem {
     final d = date;
     if (d == null) return null;
     var gap = 0;
-    for (final r in pulls) {
+    for (final r in legacyPulls) {
       gap += r.gap;
     }
     return Ymd.add(d, gap);
@@ -204,12 +204,10 @@ class TodoItem {
     return true;
   }
 
-  // ------------------------------------------------ 提前记录（隐藏标签 pf:）
-  //
-  // 每次“完成即提前”会给被平移的所有未完成任务写入 pf:YYYYMMDD.序号.天数（多次提前用逗号累加），
-  // 记录文件里，所以重启 / 组件后台操作后仍能据此把这一批还原。标签不在界面中显示，
-  // 任务完成时清除，隔天由 [TodoStore.checkDayChange] 清理。
-  static bool _isPf(String t) => t.startsWith('pf:') && t.length > 3 && _decodePf(t) != null;
+  // ------------------------------------------------ 提前显示（pv:）与旧日期平移记录（pf:）
+  // pv:YYYYMMDD.序号.间隔 只改变显示日期，不改 due/t；完成后保留以便取消完成。
+  // pf: 只用于兼容旧数据，迁移时按确切记录恢复日期。
+  static bool _isPf(String t) => (t.startsWith('pf:') || t.startsWith('pv:')) && t.length > 3 && _decodePf(t) != null;
 
   static List<PullRecord>? _decodePf(String t) {
     final out = <PullRecord>[];
@@ -234,7 +232,7 @@ class TodoItem {
     if (l.isEmpty) {
       if (i >= 0) tokens.removeAt(i);
     } else {
-      final t = 'pf:${l.map((e) => e.encoded).join(',')}';
+      final t = 'pv:${l.map((e) => e.encoded).join(',')}';
       if (i >= 0) {
         tokens[i] = t;
       } else {
@@ -254,12 +252,41 @@ class TodoItem {
     return r;
   }
 
-  void clearPulls() => _setPulls(const []);
+  void clearPulls() => tokens.removeWhere(_isPf);
 
-  /// 清理早于 [day] 的记录（隔天后不再允许还原）
-  void dropPullsBefore(DateTime day) => _setPulls(pulls.where((e) => !e.day.isBefore(day)).toList());
+  /// 旧版 pf 表示实际改写日期；新版 pv 只表示提前显示，绝不参与 plan 日期推算。
+  List<PullRecord> get legacyPulls => tokens
+      .where((t) => t.startsWith('pf:') && _isPf(t))
+      .expand((t) => _decodePf(t)!).toList();
 
-  /// 今天被提前过（且记录仍在）
+  /// 有确切 pf 记录才恢复旧版改写的 due/t；没有记录的历史日期不猜测、不重写。
+  /// 旧版所有后续任务都被平移；这里只给当时真正已显示的批次保留 pv。
+  bool migrateLegacyPulls() {
+    final old = legacyPulls;
+    if (old.isEmpty) return false;
+    ensurePlan();
+    final wasVisible = date != null && !date!.isAfter(old.last.day);
+    final existing = tokens.where((t) => t.startsWith('pv:') && _isPf(t))
+        .expand((t) => _decodePf(t)!).toList();
+    shift(old.fold<int>(0, (n, r) => n + r.gap));
+    tokens.removeWhere(_isPf);
+    _setPulls([...existing, if (wasVisible) old.last]);
+    return true;
+  }
+
+  /// 显示日期独立于 due/t；跨日仍然显示，直到完成或撤回提前显示。
+  DateTime? get displayDate {
+    DateTime? d = date;
+    for (final r in pulls) {
+      if (d == null || r.day.isBefore(d)) d = r.day;
+    }
+    return d;
+  }
+
+  bool visibleEarlyOn(DateTime day) =>
+      pulls.any((r) => !r.day.isAfter(day)) && date != null && date!.isAfter(day);
+
+  /// 只对当天的批次撤回提前显示；隔天不撤回，但保留其显示起始日。
   bool pulledOn(DateTime day) => pulls.any((e) => e.day == day);
 
   List<String> get projects =>
@@ -352,7 +379,7 @@ class TodoItem {
     if (done) return;
     done = true;
     completionDate = today;
-    clearPulls(); // 提前记录只对未完成任务有意义
+    migrateLegacyPulls(); // 保留 pv，取消完成后仍能显示在原先提前的批次
     if (priority != null) {
       tokens.add('pri:$priority');
       priority = null;

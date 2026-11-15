@@ -41,7 +41,7 @@ void main() {
 ''';
 
   group('提前后的任务就是今日任务', () {
-    test('日期被改写为今天（due 和 t），相对标签是“今日”，后续整体前移', () async {
+    test('due/t 与日期标签保持原计划，仅下一批显示于今日', () async {
       final s = await open();
       await s.applyImport(s.preview(plan), replace: true);
       await s.complete(byText(s, '今日甲'));
@@ -49,17 +49,17 @@ void main() {
       expect(msg, contains('408 今日任务已完成，已提前下一批'));
       for (final n in ['次批一', '次批二']) {
         final i = byText(s, n);
-        expect(due(i), '2026-11-11');
-        expect(Ymd.fmt(i.start!), '2026-11-11');
-        expect(Ymd.relative(i.due!, s.today), '今日');
-        expect(Ymd.chipLabel(i.due!, s.today), '今日（11-11）');
+        expect(due(i), '2026-11-12');
+        expect(Ymd.fmt(i.start!), '2026-11-12');
+        expect(Ymd.relative(i.due!, s.today), '明日');
+        expect(Ymd.chipLabel(i.due!, s.today), '明日（11-12）');
         expect(Planner.inToday(i, s.today), isTrue);
         expect(i.pulledOn(s.today), isTrue);
         expect(i.text, n); // 隐藏标签不出现在显示文字里
       }
-      expect(due(byText(s, '再后一')), '2026-11-12'); // 后续同步前移 1 天
-      expect(Ymd.relative(byText(s, '再后一').due!, s.today), '明日');
-      expect(due(byText(s, '再后二')), '2026-11-14');
+      expect(due(byText(s, '再后一')), '2026-11-13'); // 后续日期完全不变
+      expect(Ymd.relative(byText(s, '再后一').due!, s.today), '后天');
+      expect(due(byText(s, '再后二')), '2026-11-15');
       expect(due(byText(s, '数学次日')), '2026-11-12'); // 其它类别不受影响
       // 快照（桌面组件）里也是今日任务
       final rows = (WidgetActions.snapshot(s)['rows'] as List).cast<Map>();
@@ -84,7 +84,7 @@ void main() {
       await s.applyImport(s.preview(plan), replace: true);
       await s.complete(byText(s, '今日甲'));
       await s.complete(byText(s, '今日乙'));
-      expect(due(byText(s, '次批一')), '2026-11-11');
+      expect(due(byText(s, '次批一')), '2026-11-12');
       final msg = await s.reopen(s.done.firstWhere((e) => e.text == '今日乙'));
       expect(msg, contains('408 已还原刚才提前的任务'));
       expect(due(byText(s, '次批一')), '2026-11-12');
@@ -106,14 +106,14 @@ void main() {
       // 第二项通过桌面组件的后台回调完成
       final b = byText(s, '今日乙');
       await WidgetActions.handle(s, WidgetActions.completeUri(WidgetActions.idOf(b)));
-      expect(due(byText(s, '次批一')), '2026-11-11');
-      expect(File('${tmp.path}/todo.txt').readAsStringSync(), contains('pf:20261111.1.1'));
+      expect(due(byText(s, '次批一')), '2026-11-12');
+      expect(File('${tmp.path}/todo.txt').readAsStringSync(), contains('pv:20261111.1.1'));
       s = await open(); // 模拟 App 重启
       expect(byText(s, '次批一').pulledOn(s.today), isTrue);
       await s.reopen(s.done.firstWhere((e) => e.text == '今日甲'));
       expect(due(byText(s, '次批一')), '2026-11-12');
       expect(due(byText(s, '再后二')), '2026-11-15');
-      expect(File('${tmp.path}/todo.txt').readAsStringSync(), isNot(contains('pf:')));
+      expect(File('${tmp.path}/todo.txt').readAsStringSync(), isNot(contains('pv:')));
     });
 
     test('连续提前多次：取消完成最早的任务，最近几批依次还原，直到今天没有被提前的任务', () async {
@@ -123,14 +123,14 @@ void main() {
       await s.complete(byText(s, '今日乙')); // 提前一：次批一/二 → 今日
       await s.complete(byText(s, '次批一'));
       await s.complete(byText(s, '次批二')); // 提前二：再后一 → 今日
-      expect(due(byText(s, '再后一')), '2026-11-11');
-      expect(due(byText(s, '再后二')), '2026-11-13');
+      expect(due(byText(s, '再后一')), '2026-11-13');
+      expect(due(byText(s, '再后二')), '2026-11-15');
       await s.reopen(s.done.firstWhere((e) => e.text == '今日甲'));
-      // 最近一批（再后一/再后二）已还原到“提前一”之后的位置（11-12 / 11-14）；
-      // 次批一/二已经做完，第一次提前的前移保留（明天的活今天做完了，后续本来就该前移一天）
-      expect(due(byText(s, '再后一')), '2026-11-12');
-      expect(due(byText(s, '再后二')), '2026-11-14');
-      expect(Ymd.relative(byText(s, '再后一').due!, s.today), '明日');
+      // 最近一批撤回提前显示，原日期从未变过；
+      // 次批一/二已经做完，后续批次仍保持原计划日
+      expect(due(byText(s, '再后一')), '2026-11-13');
+      expect(due(byText(s, '再后二')), '2026-11-15');
+      expect(Ymd.relative(byText(s, '再后一').due!, s.today), '后天');
       final todays = s.todo.where((t) => t.category == '408' && Planner.inToday(t, s.today)).map((t) => t.text).toList();
       expect(todays, ['今日甲']);
     });
@@ -143,7 +143,7 @@ void main() {
       await s.complete(byText(s, '次批一'));
       await s.complete(byText(s, '次批二')); // 提前二
       await s.reopen(s.done.firstWhere((e) => e.text == '次批一'));
-      expect(due(byText(s, '再后一')), '2026-11-12'); // 提前二还原（回到提前一之后的位置）
+      expect(due(byText(s, '再后一')), '2026-11-13'); // 提前二还原（回到提前一之后的位置）
       final todays = s.todo.where((t) => t.category == '408' && Planner.inToday(t, s.today)).map((t) => t.text).toList();
       expect(todays, ['次批一']);
     });
@@ -156,19 +156,19 @@ void main() {
       await s.complete(byText(s, '再后二')); // 提前完成一个未来任务（今日还有次批，不触发提前）
       final msg = await s.reopen(s.done.firstWhere((e) => e.text == '再后二'));
       expect(msg, isNull); // 它是未来任务，不是今天的“原任务”
-      expect(due(byText(s, '次批一')), '2026-11-11');
+      expect(due(byText(s, '次批一')), '2026-11-12');
     });
 
-    test('隔天后提前记录被清理，不再还原', () async {
+    test('隔天后保留提前显示记录，但不再还原昨日操作', () async {
       final s = await open();
       await s.applyImport(s.preview(plan), replace: true);
       await s.complete(byText(s, '今日甲'));
       await s.complete(byText(s, '今日乙'));
       await s.complete(byText(s, '次批一'));
-      expect(File('${tmp.path}/todo.txt').readAsStringSync(), contains('pf:'));
+      expect(File('${tmp.path}/todo.txt').readAsStringSync(), contains('pv:'));
       clock = DateTime(2026, 11, 12, 8);
       await s.checkDayChange();
-      expect(File('${tmp.path}/todo.txt').readAsStringSync(), isNot(contains('pf:')));
+      expect(File('${tmp.path}/todo.txt').readAsStringSync(), contains('pv:'));
       // 昨天的原任务现在取消完成：不会把昨天提前的任务再推回去
       final before = byText(s, '次批二').toLine();
       await s.reopen(s.done.firstWhere((e) => e.text == '今日甲'));

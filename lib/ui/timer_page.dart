@@ -1,3 +1,4 @@
+import 'local_wall_clock.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -139,6 +140,8 @@ class TimerPageState extends State<TimerPage> {
                 ),
                 const Spacer(),
                 Text(cat, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                const LocalWallClock(key: Key('timer_wall_clock')),
                 const SizedBox(height: 8),
                 const Text('正向计时', style: TextStyle(color: Colors.black45)),
                 const SizedBox(height: 24),

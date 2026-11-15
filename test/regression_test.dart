@@ -42,8 +42,8 @@ void main() {
       expect(Planner.todaySet(s.todo, s.today).length, 1);
       final msg = await s.complete(s.todo.first);
       expect(msg, contains('今日任务已完成，已提前下一批'));
-      s = await open(); // 重启后日期仍是提前后的
-      expect(due(s.todo.first), '2026-11-11');
+      s = await open(); // 重启后提前显示仍有效，日期未变
+      expect(due(s.todo.first), '2026-11-12');
       expect(Planner.todaySet(s.todo, s.today).length, 1);
       expect(s.todo.first.text, contains('5.1-5.3 二叉树'));
     });
@@ -58,7 +58,7 @@ void main() {
       expect(await s.checkDayChange(), isNull); // 昨天没有任务，不顺延
       expect(due(s.todo.first), '2026-11-11');
       expect(await s.complete(s.todo.first), isNotNull);
-      expect(due(s.todo.first), '2026-11-11');
+      expect(due(s.todo.first), '2026-11-12');
     });
 
     test('在“全部”页勾选、或设备日期早于计划日期（今日为空）时也会提前', () async {
@@ -68,7 +68,7 @@ void main() {
       expect(Planner.todaySet(s.todo, s.today), isEmpty);
       final msg = await s.complete(s.todo.first); // 勾掉 11-11 的任务
       expect(msg, contains('今日任务已完成，已提前下一批'));
-      expect(due(s.todo.first), '2026-11-10'); // 11-12 的任务被提前到今天
+      expect(due(s.todo.first), '2026-11-12'); // 11-12 的任务被提前到今天
     });
 
     test('重复“追加”导入同一份计划：自动跳过重复（否则每天多一份，今日永远清不空）', () async {
@@ -83,8 +83,8 @@ void main() {
     test('手动“提前下一批”：今日还没做完也能提前；没有后续任务时给出提示', () async {
       final s = await open();
       await s.applyImport(s.preview('A due:2026-11-11\nB due:2026-11-12\nC due:2026-11-13'), replace: true);
-      expect(await s.pullNextBatch(), '已把 11月12日 的任务提前到今天');
-      expect(s.todo.map(due).toList(), ['2026-11-11', '2026-11-11', '2026-11-12']);
+      expect(await s.pullNextBatch(), '已把 11月12日 的任务提前显示到今天');
+      expect(s.todo.map(due).toList(), ['2026-11-11', '2026-11-12', '2026-11-13']);
       await s.undo();
       expect(s.todo.map(due).toList(), ['2026-11-11', '2026-11-12', '2026-11-13']);
       final s2 = await open();
@@ -105,8 +105,8 @@ void main() {
       final now = Planner.todaySet(s.todo, s.today);
       expect(now.length, 6); // 11-12 的 6 项整批到了今天
       expect(now.every((e) => e.text.startsWith('数据结构')), true);
-      expect(s.todo.where((e) => e.due == d('2026-11-12')).length, 4); // 原 11-13 的 4 项
-      // 日历中 11-12 之后的间隔保持（原 11-14 → 11-13）
+      expect(s.todo.where((e) => e.due == d('2026-11-12')).length, 6); // 原 11-12 的 6 项日期不变
+      // 日历中 11-12 之后的间隔保持（所有任务 due/t 均不改写）
       expect(s.todo.any((e) => e.due == d('2026-11-13')), true);
     });
   });

@@ -1,3 +1,4 @@
+import 'local_wall_clock.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -328,6 +329,8 @@ class _LockedPageState extends State<LockedPage> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text(widget.store.categoryLabel(focus.runningCategory),
                   key: const Key('locked_cat'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              const LocalWallClock(key: Key('locked_wall_clock')),
               const SizedBox(height: 8),
               const Text('锁屏倒计时', style: TextStyle(color: Colors.black45)),
               const SizedBox(height: 32),

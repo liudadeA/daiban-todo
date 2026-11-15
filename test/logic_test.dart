@@ -145,7 +145,7 @@ void main() {
 
   group('完成即提前 pullForward', () {
     final today = d('2026-11-11');
-    test('今日已清空 → 下一批整体提前到今天，间隔保持', () {
+    test('今日已清空 → 下一批提前显示，所有计划日期不变', () {
       final items = [
         p('x 2026-11-11 今天已做 due:2026-11-11'),
         p('B1 due:2026-11-12'),
@@ -156,14 +156,14 @@ void main() {
       ];
       final gap = Planner.pullForward(items, today);
       expect(gap, 1);
-      expect(dates(items), ['2026-11-11', '2026-11-11', '2026-11-11', '2026-11-13', '2026-11-19', '-']);
-      expect(items[2].toLine(), 'B2 due:2026-11-11 t:2026-11-11 pf:20261111.1.1'); // 隐藏的提前记录，供“取消完成”还原
+      expect(dates(items), ['2026-11-11', '2026-11-12', '2026-11-12', '2026-11-14', '2026-11-20', '-']);
+      expect(items[2].toLine(), 'B2 due:2026-11-12 t:2026-11-12 pv:20261111.1.1'); // 隐藏的提前记录，供“取消完成”还原
       expect(items[2].text, 'B2'); // 不出现在显示文字里
     });
     test('下一批隔了几天：提前整个间隔', () {
       final items = [p('B due:2026-11-15'), p('C due:2026-11-17')];
       expect(Planner.pullForward(items, today), 4);
-      expect(dates(items), ['2026-11-11', '2026-11-13']);
+      expect(dates(items), ['2026-11-15', '2026-11-17']);
     });
     test('今日还有未完成（含逾期）→ 不提前', () {
       final items = [p('逾期 due:2026-11-09'), p('B due:2026-11-12')];
@@ -179,8 +179,8 @@ void main() {
       Planner.pullForward(items, today);
       expect(Planner.todaySet(items, today).map((e) => e.text), ['B']);
       items.removeAt(0);
-      expect(Planner.pullForward(items, today), 1);
-      expect(dates(items), ['2026-11-11']);
+      expect(Planner.pullForward(items, today), 2);
+      expect(dates(items), ['2026-11-13']);
     });
   });
 
@@ -232,11 +232,11 @@ void main() {
       expect(msg, isNull); // 还剩一套
       msg = await store.complete(store.todo[0]);
       expect(msg, contains('今日任务已完成，已提前下一批'));
-      // 原 11-11 批次提前到今天 11-10，11-12 → 11-11
-      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-10', '2026-11-11']);
+      // 11-11 批次提前显示到 11-10，11-12 批次不提前显示，日期全部不变
+      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-11', '2026-11-12']);
       expect(store.done.length, 3);
       expect((await store.doneFile.readAsString()).split('\n').where((e) => e.isNotEmpty).length, 3);
-      expect((await store.todoFile.readAsString()), contains('做试卷 3 due:2026-11-10'));
+      expect((await store.todoFile.readAsString()), contains('做试卷 3 due:2026-11-11'));
     });
 
     test('关闭“完成即提前”开关 → 不提前', () async {
@@ -252,7 +252,7 @@ void main() {
       await store.applyImport(store.preview('明天的 due:2026-11-11\n后天的 due:2026-11-12'), replace: true);
       final msg = await store.complete(store.todo[0]);
       expect(msg, contains('今日任务已完成，已提前下一批'));
-      expect(Ymd.fmt(store.todo[0].due!), '2026-11-10');
+      expect(Ymd.fmt(store.todo[0].due!), '2026-11-12');
     });
 
     test('今日还有任务时勾选未来任务 → 不触发提前', () async {
@@ -297,30 +297,30 @@ void main() {
       expect(Ymd.fmt(store.todo[0].due!), '2026-11-11');
     });
 
-    test('冲突检查：提前 → 次日顺延 → 再提前，日期保持一致', () async {
+    test('冲突检查：提前显示 → 次日未到原日期不顺延 → 再提前显示，日期保持一致', () async {
       await store.applyImport(
           store.preview('T1 due:2026-11-10\nT2 due:2026-11-11\nT3 due:2026-11-12'), replace: true);
       // 11-10：做完 T1 → T2 提前到今天
       expect(await store.complete(store.todo[0]), isNotNull);
-      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-10', '2026-11-11']);
+      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-11', '2026-11-12']);
       // 11-10 没做 T2 就过夜
       clock = DateTime(2026, 11, 11, 7, 0);
-      expect(await store.checkDayChange(), contains('顺延：未分类 1 天'));
-      // T2 逾期(11-10)，T3 由 11-11 顺延到 11-12
-      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-10', '2026-11-12']);
+      expect(await store.checkDayChange(), isNull);
+      // T2 原日期为今天，不因昨日提前显示就变成逾期
+      expect(store.todo.map((e) => Ymd.fmt(e.due!)).toList(), ['2026-11-11', '2026-11-12']);
       // 11-11 做完 T2（逾期，属今日任务）→ T3 提前到今天
       expect(await store.complete(store.todo[0]), contains('今日任务已完成，已提前下一批'));
-      expect(Ymd.fmt(store.todo[0].due!), '2026-11-11');
+      expect(Ymd.fmt(store.todo[0].due!), '2026-11-12');
       // 次日再检查：T3 昨天未做 → 顺延机制只动“之后”的任务，T3 本身逾期
       clock = DateTime(2026, 11, 12, 7, 0);
       expect(await store.checkDayChange(), isNull); // 没有后续任务可顺延
-      expect(Ymd.fmt(store.todo[0].due!), '2026-11-11');
+      expect(Ymd.fmt(store.todo[0].due!), '2026-11-12');
     });
 
     test('撤销：提前之后可恢复', () async {
       await store.applyImport(store.preview('A due:2026-11-10\nB due:2026-11-11'), replace: true);
       await store.complete(store.todo[0]);
-      expect(Ymd.fmt(store.todo[0].due!), '2026-11-10');
+      expect(Ymd.fmt(store.todo[0].due!), '2026-11-11');
       await store.undo();
       expect(store.todo.map((e) => e.text).toList(), ['A', 'B']);
       expect(Ymd.fmt(store.todo[1].due!), '2026-11-11');

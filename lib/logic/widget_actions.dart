@@ -73,6 +73,7 @@ class WidgetActions {
           'category': store.categoryLabel(t.category),
           'date': t.date == null ? null : Ymd.fmt(t.date!),
           'start': t.start == null ? null : Ymd.fmt(t.start!),
+          'displayDate': t.displayDate == null ? null : Ymd.fmt(t.displayDate!),
         }
     ];
     return {

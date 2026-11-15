@@ -252,6 +252,7 @@ void main() {
       expect(calls, containsAll(['keep:true', 'startPin']));
       expect(find.text('数学'), findsOneWidget);
       expect(find.byKey(const Key('timer_clock')), findsOneWidget);
+      expect(find.byKey(const Key('timer_wall_clock')), findsOneWidget);
 
       // 系统返回键 → 弹窗
       final dynamic widgetsAppState = tester.state(find.byType(WidgetsApp));

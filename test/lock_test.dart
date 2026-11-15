@@ -264,6 +264,7 @@ void main() {
       expect(calls, containsAll(['keep:true', 'startPin', 'isPinned']));
       expect(focus.isCountdown, isTrue);
       expect(find.byKey(const Key('locked_view')), findsOneWidget);
+      expect(find.byKey(const Key('locked_wall_clock')), findsOneWidget);
       expect(find.byKey(const Key('locked_cat')), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('locked_clock'))).data, '45:00');
 
