@@ -37,6 +37,10 @@ class ImportPreview {
       t.setCategory(category, keepOther: keepOtherTags);
     }
   }
+
+  /// 导入数据里出现的类别（第一个 +标签；没有则为未分类）。
+  Set<String?> importCategories() => {...todo, ...done}.map((e) => e.category).toSet();
+
 }
 
 /// 数据层：todo.txt / done.txt 存在应用私有目录，设置与“上次处理日期”存在 SharedPreferences。
@@ -325,13 +329,15 @@ class TodoStore extends ChangeNotifier {
   }
 
   /// 导入。追加模式下跳过与现有任务完全相同的行（避免重复导入造成每天多出一份，
-  /// 导致“今日任务”永远清不空）。返回跳过的条数。
+  /// 导致“今日任务”永远清不空）。覆盖模式只删除导入数据中出现的那些类别
+  ///（待办和已完成都替换），其它类别原样保留。返回跳过的条数。
   Future<int> applyImport(ImportPreview p, {required bool replace}) async {
     _pushUndo();
     final c = today;
     if (replace) {
-      todo = [];
-      done = [];
+      final cats = p.importCategories();
+      todo.removeWhere((t) => cats.contains(t.category));
+      done.removeWhere((t) => cats.contains(t.category));
     }
     final seenTodo = todo.map((e) => e.toLine()).toSet();
     final seenDone = done.map((e) => e.toLine()).toSet();

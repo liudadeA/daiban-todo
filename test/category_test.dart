@@ -228,7 +228,13 @@ void main() {
       p.applyCategory('408', keepOtherTags: false);
       expect(p.todo.single.toLine(), '做试卷 due:2026-11-12 +408');
       await s.applyImport(p, replace: true);
-      expect(s.categories, ['408']);
+      // 覆盖只替换导入的 408，数学和未分类仍在（同一目录里 setUp 已写入的计划）。
+      final imported = s.todo.where((t) => t.category == '408').single;
+      expect(imported.text, '做试卷');
+      expect(imported.toLine(), contains('due:2026-11-12'));
+      expect(s.categories, ['408', '数学']);
+      expect(s.hasUncategorized, isTrue);
+      expect(s.todo.any((t) => t.text == '数学 A'), isTrue);
     });
     test('ics：默认类别 = 日历名第一个词；改成“数学”后科目标签保留为次要标签', () async {
       final ics = File('test/fixtures/plan408.ics').readAsStringSync();
@@ -251,7 +257,8 @@ void main() {
       await s.applyImport(p1, replace: true);
       final p2 = s.preview('数学 一 due:2026-11-11\n数学 二 due:2026-11-12');
       p2.applyCategory('数学');
-      await s.applyImport(p2, replace: false);
+      // 覆盖只动「数学」，不会清掉刚导入的 408。
+      await s.applyImport(p2, replace: true);
       await s.complete(s.todo.firstWhere((t) => t.text == '408 一'));
       expect(dueOf(s, '408'), ['2026-11-12']);
       expect(dueOf(s, '数学'), ['2026-11-11', '2026-11-12']);

@@ -8,7 +8,7 @@ void main() {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(gradle, contains('applicationId = "cn.daiban.daiban.basic"'));
     expect(gradle, contains('namespace = "cn.daiban.daiban"'));
-    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.3+10'));
+    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.5.4+11'));
     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     expect(manifest, contains('android:label="待办 基础版"'));
     expect(File('lib/main.dart').readAsStringSync(), contains("title: '待办 基础版'"));

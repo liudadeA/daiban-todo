@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../logic/todo_item.dart';
 
 /// 类别输入框 + 已有类别快捷选择（点击 chip 即填入）。
 class CategoryField extends StatelessWidget {
@@ -83,8 +84,12 @@ Future<ImportChoice?> showImportDialog(BuildContext context, TodoStore store, Im
               title: const Text('保留任务原有的其它 +标签'),
               subtitle: const Text('取消勾选则清除原有 +标签，只保留上面的类别'),
             ),
-            const Text('「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」会先清空现有待办和已完成。',
-                style: TextStyle(fontSize: 12, color: Colors.black54)),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: cat,
+              builder: (_, v, _) => Text(_overwriteHint(p, v.text, keep),
+                  key: const Key('import_overwrite_hint'),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            ),
           ]),
         ),
         actions: [
@@ -115,4 +120,21 @@ Future<String?> showCategoryDialog(BuildContext context, TodoStore store,
       ],
     ),
   );
+}
+
+
+String _overwriteHint(ImportPreview p, String typed, bool keepOtherTags) {
+  final assigned = TodoItem.normCategory(typed);
+  if (assigned != null) {
+    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$assigned」这一类别的现有待办和已完成，其它类别不受影响。';
+  }
+  if (!keepOtherTags) {
+    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换未分类的现有待办和已完成，已有类别不受影响。';
+  }
+  final names = {
+    for (final t in [...p.todo, ...p.done]) t.category ?? '未分类',
+  }.toList()
+    ..sort();
+  final which = names.isEmpty ? '导入文件中的类别' : names.join('、');
+  return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$which」的现有待办和已完成，其它类别不受影响。';
 }
