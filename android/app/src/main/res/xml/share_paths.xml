@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 只开放缓存目录下的 share/，用于分享统计图片 -->
+<!-- share/ 用于分享统计图片；updates/ 用于下载待安装的 APK -->
 <paths>
     <cache-path name="share" path="share/" />
+    <cache-path name="updates" path="updates/" />
 </paths>

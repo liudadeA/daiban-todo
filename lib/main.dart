@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -6,7 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/focus_store.dart';
 import 'data/store.dart';
+import 'logic/update_check.dart';
+import 'platform/app_update.dart';
 import 'ui/home_page.dart';
+import 'ui/update_widgets.dart';
 import 'widget_sync.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -29,7 +34,8 @@ Future<void> main() async {
 class DaibanApp extends StatefulWidget {
   final TodoStore store;
   final FocusStore focus;
-  const DaibanApp({super.key, required this.store, required this.focus});
+  final UpdateCoordinator? updateCoordinator;
+  const DaibanApp({super.key, required this.store, required this.focus, this.updateCoordinator});
 
   @override
   State<DaibanApp> createState() => _DaibanAppState();
@@ -54,6 +60,7 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
         final t = await _channel.invokeMethod<String>('getInitialText');
         if (t != null && t.trim().isNotEmpty) _homeKey.currentState?.importText(t);
       } catch (_) {}
+      unawaited(_autoUpdateCheck());
     });
   }
 
@@ -86,6 +93,18 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
         action: SnackBarAction(label: '撤销', onPressed: () => widget.store.undo()),
       ));
     }
+  }
+
+  /// 启动后在后台检查本版本是否有新的 GitHub Release。不拦截首帧，不强制更新。
+  Future<void> _autoUpdateCheck() async {
+    final injected = widget.updateCoordinator;
+    if (injected == null && Platform.environment.containsKey('FLUTTER_TEST')) return;
+    final c = injected ?? UpdateCoordinator.production();
+    final r = await c.check(manual: false);
+    if (!mounted || !r.hasInstallableUpdate || r.status == UpdateStatus.dismissed) return;
+    if (r.status != UpdateStatus.available) return;
+    final m = messengerKey.currentState;
+    if (m != null) showUpdateBanner(m, c, r.update!);
   }
 
   @override

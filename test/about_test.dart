@@ -19,7 +19,7 @@ void main() {
       if (call.method == 'Clipboard.setData') clip = (call.arguments as Map)['text'] as String?;
       return null;
     });
-    tester.view.physicalSize = const Size(1080, 2600);
+    tester.view.physicalSize = const Size(1080, 5000);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(const MaterialApp(home: AboutPage()));
