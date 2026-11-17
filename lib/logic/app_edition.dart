@@ -40,6 +40,6 @@ class EditionProfile {
 /// 本构建的版本身份。版本号须与 pubspec 保持一致。
 class AppEdition {
   static const profile = EditionProfile.basic;
-  static const versionName = '1.5.5';
-  static const pubspecBuild = 12;
+  static const versionName = '1.5.6';
+  static const pubspecBuild = 13;
 }
