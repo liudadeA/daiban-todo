@@ -319,6 +319,8 @@ void main() {
       });
       await tester.pumpWidget(MaterialApp(home: HomePage(store: store)));
       await tester.pump();
+      await tester.tap(find.byKey(const Key('todaySortToggle')));
+      await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
       final t408 = tester.widget<Text>(find.byKey(const Key('est_408'))).data!;
       expect(t408, contains('进度 2/4'));
       expect(t408, contains('计划 11月14日'));

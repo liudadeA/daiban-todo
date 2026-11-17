@@ -51,6 +51,8 @@ void main() {
     });
     await tester.pumpWidget(MaterialApp(home: HomePage(store: store)));
     await tester.pump();
+    await tester.tap(find.byKey(const Key('todaySortToggle')));
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('408 · 今日剩余 1 项'), findsOneWidget);
     expect(find.textContaining('数学 · 今日剩余 1 项'), findsOneWidget);
     expect(find.text('提前下一批'), findsOneWidget); // 只有 408 有后续任务

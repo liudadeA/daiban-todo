@@ -573,22 +573,67 @@ class HomePageState extends State<HomePage> {
       ),
       _timerGrid(),
     ];
-    for (final g in rows) {
-      final cleared = g.today.isEmpty;
-      final est = Estimator.forCategory(store.todo, store.done, today, g.cat);
-      children.add(Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
-        child: Row(children: [
-          Expanded(
-            child: Text(
-              '${store.categoryLabel(g.cat)} · ${cleared ? '今日已清空' : '今日剩余 ${g.today.length} 项'}',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: g.today.any((t) => t.date!.isBefore(today)) ? Colors.red : Theme.of(context).colorScheme.primary),
+    if (_todayByCategory) {
+      for (final g in rows) {
+        final cleared = g.today.isEmpty;
+        final est = Estimator.forCategory(store.todo, store.done, today, g.cat);
+        final catKey = g.cat ?? '';
+        final collapsed = _collapsedTodayCats.contains(catKey);
+        final color = g.today.any((t) => t.date!.isBefore(today)) ? Colors.red : Theme.of(context).colorScheme.primary;
+        children.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+          child: Row(children: [
+            InkWell(
+              key: Key('today_cat_$catKey'),
+              onTap: () => setState(() {
+                if (!_collapsedTodayCats.remove(catKey)) _collapsedTodayCats.add(catKey);
+              }),
+              child: Icon(collapsed ? Icons.chevron_right : Icons.expand_more, size: 22, color: color),
             ),
-          ),
-          if (g.hasLater)
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() {
+                  if (!_collapsedTodayCats.remove(catKey)) _collapsedTodayCats.add(catKey);
+                }),
+                child: Text(
+                  '${store.categoryLabel(g.cat)} · ${cleared ? '今日已清空' : '今日剩余 ${g.today.length} 项'}',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color),
+                ),
+              ),
+            ),
+            if (g.hasLater)
+              (cleared ? FilledButton.tonalIcon : TextButton.icon)(
+                onPressed: () async {
+                  final msg = await store.pullNextBatch(g.cat);
+                  if (mounted) _toast(msg, undo: true);
+                },
+                icon: const Icon(Icons.fast_forward, size: 18),
+                label: const Text('提前下一批'),
+              ),
+          ]),
+        ));
+        children.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Text(Estimator.compact(est, today),
+              key: Key('est_${g.cat ?? ''}'), style: const TextStyle(fontSize: 12, color: Colors.black45)),
+        ));
+        if (!collapsed) {
+          children.addAll(g.today.map((t) => _tile(t)));
+          children.addAll(g.undated.map((t) => _tile(t)));
+        }
+      }
+    } else {
+      for (final g in rows.where((g) => g.hasLater)) {
+        final cleared = g.today.isEmpty;
+        children.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          child: Row(children: [
+            Expanded(
+              child: Text(
+                '${store.categoryLabel(g.cat)}${cleared ? ' · 今日已清空' : ''}',
+                style: const TextStyle(color: Colors.black54),
+              ),
+            ),
             (cleared ? FilledButton.tonalIcon : TextButton.icon)(
               onPressed: () async {
                 final msg = await store.pullNextBatch(g.cat);
@@ -597,15 +642,24 @@ class HomePageState extends State<HomePage> {
               icon: const Icon(Icons.fast_forward, size: 18),
               label: const Text('提前下一批'),
             ),
-        ]),
-      ));
-      children.add(Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-        child: Text(Estimator.compact(est, today),
-            key: Key('est_${g.cat ?? ''}'), style: const TextStyle(fontSize: 12, color: Colors.black45)),
-      ));
-      children.addAll(g.today.map((t) => _tile(t)));
-      children.addAll(g.undated.map((t) => _tile(t)));
+          ]),
+        ));
+      }
+      final visible = <TodoItem>[
+        for (final g in rows) ...[...g.today, ...g.undated],
+      ]..sort(_cmp);
+      var first = true;
+      String? lastHeader;
+      for (final t in visible) {
+        final d = t.date;
+        final h = d == null ? '无日期' : _dateLabel(d);
+        if (first || h != lastHeader) {
+          children.add(_header(h, color: d != null && d.isBefore(today) ? Colors.red : null));
+          lastHeader = h;
+          first = false;
+        }
+        children.add(_tile(t));
+      }
     }
     if (rows.isEmpty) {
       children.add(SizedBox(
@@ -616,21 +670,76 @@ class HomePageState extends State<HomePage> {
     return ListView(children: children);
   }
 
+  /// 今日 / 全部各自记住排序：false = 按时间（默认），true = 按类别（组内仍按时间）。
+  static const allSortPrefKey = 'allSortByCategory';
+  static const todaySortPrefKey = 'todaySortByCategory';
+  final Set<String> _collapsedAllCats = {};
+  final Set<String> _collapsedTodayCats = {};
+
+  bool get _allByCategory => store.prefs.getBool(allSortPrefKey) ?? false;
+  bool get _todayByCategory => store.prefs.getBool(todaySortPrefKey) ?? false;
+  bool get _currentByCategory => _tab == 0 ? _todayByCategory : _allByCategory;
+
+  Future<void> _toggleSort() async {
+    final key = _tab == 0 ? todaySortPrefKey : allSortPrefKey;
+    await store.prefs.setBool(key, !(store.prefs.getBool(key) ?? false));
+    if (mounted) setState(() {});
+  }
+
+  Widget _allCategoryHeader(String? cat, int count, bool collapsed) {
+    final key = cat ?? '';
+    return InkWell(
+      key: Key('all_cat_$key'),
+      onTap: () => setState(() {
+        if (!_collapsedAllCats.remove(key)) _collapsedAllCats.add(key);
+      }),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Row(children: [
+          Icon(collapsed ? Icons.chevron_right : Icons.expand_more,
+              size: 22, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              '${store.categoryLabel(cat)} · $count 项',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   Widget _allView() {
     final items = [...store.todo]..sort(_cmp);
     if (items.isEmpty) return _empty('没有待办任务');
     final children = <Widget>[];
-    var first = true;
-    String? lastHeader;
-    for (final t in items) {
-      final d = t.date;
-      final h = d == null ? '无日期' : _dateLabel(d);
-      if (first || h != lastHeader) {
-        children.add(_header(h, color: d != null && d.isBefore(store.today) ? Colors.red : null));
-        lastHeader = h;
-        first = false;
+    if (_allByCategory) {
+      final groups = Planner.groupByCategory(items);
+      final cats = groups.keys.toList()
+        ..sort((a, b) {
+          if (a == null || b == null) return a == null ? 1 : -1;
+          return a.compareTo(b);
+        });
+      for (final cat in cats) {
+        final list = [...groups[cat]!]..sort(_cmp);
+        final collapsed = _collapsedAllCats.contains(cat ?? '');
+        children.add(_allCategoryHeader(cat, list.length, collapsed));
+        if (!collapsed) children.addAll(list.map(_tile));
       }
-      children.add(_tile(t));
+    } else {
+      var first = true;
+      String? lastHeader;
+      for (final t in items) {
+        final d = t.date;
+        final h = d == null ? '无日期' : _dateLabel(d);
+        if (first || h != lastHeader) {
+          children.add(_header(h, color: d != null && d.isBefore(store.today) ? Colors.red : null));
+          lastHeader = h;
+          first = false;
+        }
+        children.add(_tile(t));
+      }
     }
     children.add(const SizedBox(height: 80));
     return ListView(children: children);
@@ -683,9 +792,16 @@ class HomePageState extends State<HomePage> {
           },
           child: Scaffold(
           appBar: _selMode ? _selectionBar() : AppBar(
-            title: Text('待办 专注版 · ${titles[_tab]}'),
+            title: Text('待办 · ${titles[_tab]}'),
             actions: [
+              if (_tab == 0 || _tab == 1)
+                TextButton(
+                  key: Key(_tab == 0 ? 'todaySortToggle' : 'allSortToggle'),
+                  onPressed: _toggleSort,
+                  child: Text(_currentByCategory ? '按类别' : '按时间'),
+                ),
               PopupMenuButton<String>(
+
                 onSelected: (v) {
                   switch (v) {
                     case 'file':
