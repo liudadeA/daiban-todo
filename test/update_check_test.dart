@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -293,13 +294,15 @@ void main() {
       prefs: prefs,
     );
     final r = await c.check(manual: false);
+    final messengerKey = GlobalKey<ScaffoldMessengerState>();
+    final navKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(MaterialApp(
-      scaffoldMessengerKey: GlobalKey<ScaffoldMessengerState>(),
+      scaffoldMessengerKey: messengerKey,
+      navigatorKey: navKey,
       home: const Scaffold(body: Text('首页')),
     ));
-    final key = tester.widget<MaterialApp>(find.byType(MaterialApp)).scaffoldMessengerKey!;
     await tester.pump();
-    showUpdateBanner(key.currentState!, c, r.update!);
+    showUpdateBanner(messengerKey.currentState!, c, r.update!, hostContext: navKey.currentContext!);
     await tester.pumpAndSettle();
     expect(find.byKey(updateBannerKey), findsOneWidget);
     expect(find.text('首页'), findsOneWidget);
@@ -308,6 +311,83 @@ void main() {
     expect(find.byKey(updateBannerKey), findsNothing);
     expect(find.text('首页'), findsOneWidget);
     expect(prefs.getString(dismissedPrefKey(EditionProfile.focus)), '1.6.7');
+  });
+
+  testWidgets('启动横幅点更新会开始下载并显示进度，不会把该版本记为稍后', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    var downloads = 0;
+    String? installed;
+    final started = Completer<void>();
+    final finish = Completer<File>();
+    final c = coordinator(
+      edition: EditionProfile.focus,
+      device: const DeviceInfo(versionName: '1.6.6', versionCode: 2015, abi: 'arm64-v8a'),
+      prefs: prefs,
+      download: (asset, {onProgress}) async {
+        downloads++;
+        onProgress?.call(40, 100);
+        started.complete();
+        return finish.future;
+      },
+      install: (path) async {
+        installed = path;
+        return 'started';
+      },
+    );
+    final r = await c.check(manual: false);
+    final messengerKey = GlobalKey<ScaffoldMessengerState>();
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+      scaffoldMessengerKey: messengerKey,
+      navigatorKey: navKey,
+      home: const Scaffold(body: Text('首页')),
+    ));
+    await tester.pump();
+    showUpdateBanner(messengerKey.currentState!, c, r.update!, hostContext: navKey.currentContext!);
+    await tester.pumpAndSettle();
+    expect(find.byKey(updateNowKey), findsOneWidget);
+    await tester.tap(find.byKey(updateNowKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('下载更新'), findsOneWidget);
+    expect(find.textContaining('正在下载 1.6.7'), findsOneWidget);
+    expect(started.isCompleted, isTrue);
+    expect(downloads, 1);
+    expect(prefs.getString(dismissedPrefKey(EditionProfile.focus)), isNull);
+    finish.complete(File('/tmp/daiban-test-update.apk'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(updateBannerKey), findsNothing);
+    expect(installed, '/tmp/daiban-test-update.apk');
+    expect(find.text('下载更新'), findsNothing);
+    expect(find.text('首页'), findsOneWidget);
+  });
+
+  testWidgets('启动横幅点更新时下载失败会提示错误', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final c = coordinator(
+      edition: EditionProfile.focus,
+      device: const DeviceInfo(versionName: '1.6.6', versionCode: 2015, abi: 'arm64-v8a'),
+      download: (asset, {onProgress}) async {
+        throw const UpdateCheckException('下载失败，请稍后重试');
+      },
+    );
+    final r = await c.check(manual: false);
+    final messengerKey = GlobalKey<ScaffoldMessengerState>();
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+      scaffoldMessengerKey: messengerKey,
+      navigatorKey: navKey,
+      home: const Scaffold(body: Text('首页')),
+    ));
+    await tester.pump();
+    showUpdateBanner(messengerKey.currentState!, c, r.update!, hostContext: navKey.currentContext!);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(updateNowKey));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('下载失败，请稍后重试'), findsOneWidget);
   });
 
   testWidgets('关于页手动检查：已最新 / 有更新 / 网络错误', (tester) async {

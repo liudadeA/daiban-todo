@@ -9,13 +9,13 @@ void main() {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(gradle, contains('applicationId = "cn.daiban.daiban"'));
     expect(gradle, contains('namespace = "cn.daiban.daiban"'));
-    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.6.9+18'));
+    expect(File('pubspec.yaml').readAsStringSync(), contains('version: 1.6.10+19'));
     final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     expect(manifest, contains('android:label="待办 专注版"'));
     expect(File('lib/main.dart').readAsStringSync(), contains("title: '待办 专注版'"));
     expect(AppEdition.profile, EditionProfile.focus);
-    expect(AppEdition.versionName, '1.6.9');
-    expect(AppEdition.pubspecBuild, 18);
+    expect(AppEdition.versionName, '1.6.10');
+    expect(AppEdition.pubspecBuild, 19);
     expect(manifest, contains('android.permission.INTERNET'));
     expect(manifest, contains('android.permission.REQUEST_INSTALL_PACKAGES'));
     expect(manifest, contains(r'${applicationId}.shareprovider'));
