@@ -100,7 +100,10 @@ class _DaibanAppState extends State<DaibanApp> with WidgetsBindingObserver {
     if (!mounted || !r.hasInstallableUpdate || r.status == UpdateStatus.dismissed) return;
     if (r.status != UpdateStatus.available) return;
     final m = messengerKey.currentState;
-    if (m != null) showUpdateBanner(m, c, r.update!);
+    final host = navigatorKey.currentContext;
+    if (m != null && host != null && host.mounted) {
+      showUpdateBanner(m, c, r.update!, hostContext: host);
+    }
   }
 
   @override

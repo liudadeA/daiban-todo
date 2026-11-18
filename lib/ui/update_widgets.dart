@@ -83,8 +83,14 @@ class _UpdateAboutSectionState extends State<UpdateAboutSection> {
 /// 下载后调起系统安装确认界面。不能静默安装。
 Future<void> startUpdateFlow(BuildContext context, UpdateCoordinator coordinator, EditionUpdate update) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
+  if (!context.mounted || Navigator.maybeOf(context) == null) {
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(const SnackBar(content: Text('无法开始下载，请到关于页再试。'), duration: Duration(seconds: 4)));
+    return;
+  }
   final progress = ValueNotifier<(int, int?)>((0, null));
   var cancelled = false;
+  try {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -118,7 +124,6 @@ Future<void> startUpdateFlow(BuildContext context, UpdateCoordinator coordinator
       );
     },
   );
-  try {
     final file = await coordinator.downloadUpdate(update, onProgress: (r, t) {
       progress.value = (r, t);
     });
@@ -149,7 +154,15 @@ Future<void> startUpdateFlow(BuildContext context, UpdateCoordinator coordinator
   }
 }
 
-void showUpdateBanner(ScaffoldMessengerState messenger, UpdateCoordinator coordinator, EditionUpdate update) {
+/// [hostContext] 必须位于 Navigator 之下（例如页面或 navigatorKey.currentContext）。
+/// 不能使用 ScaffoldMessenger 自身的 context：它在 Navigator 之上，showDialog 会失败，
+/// 看起来就像横幅里的「更新」没有开始下载。
+void showUpdateBanner(
+  ScaffoldMessengerState messenger,
+  UpdateCoordinator coordinator,
+  EditionUpdate update, {
+  required BuildContext hostContext,
+}) {
   messenger.hideCurrentMaterialBanner();
   messenger.showMaterialBanner(MaterialBanner(
     key: updateBannerKey,
@@ -167,7 +180,9 @@ void showUpdateBanner(ScaffoldMessengerState messenger, UpdateCoordinator coordi
         key: updateNowKey,
         onPressed: () {
           messenger.hideCurrentMaterialBanner();
-          startUpdateFlow(messenger.context, coordinator, update);
+          if (hostContext.mounted) {
+            startUpdateFlow(hostContext, coordinator, update);
+          }
         },
         child: const Text('更新'),
       ),
