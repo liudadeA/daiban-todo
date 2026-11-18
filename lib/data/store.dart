@@ -329,15 +329,15 @@ class TodoStore extends ChangeNotifier {
   }
 
   /// 导入。追加模式下跳过与现有任务完全相同的行（避免重复导入造成每天多出一份，
-  /// 导致“今日任务”永远清不空）。覆盖模式只删除导入数据中出现的那些类别
-  ///（待办和已完成都替换），其它类别原样保留。返回跳过的条数。
+  /// 导致“今日任务”永远清不空）。覆盖模式只删除导入数据中出现的那些类别的待办，
+  /// 已完成一律保留；其它类别原样保留。导入文件里的已完成行若与现有完全相同则
+  /// 跳过，否则追加。返回跳过的条数。
   Future<int> applyImport(ImportPreview p, {required bool replace}) async {
     _pushUndo();
     final c = today;
     if (replace) {
       final cats = p.importCategories();
       todo.removeWhere((t) => cats.contains(t.category));
-      done.removeWhere((t) => cats.contains(t.category));
     }
     final seenTodo = todo.map((e) => e.toLine()).toSet();
     final seenDone = done.map((e) => e.toLine()).toSet();
@@ -429,6 +429,10 @@ class TodoStore extends ChangeNotifier {
     await setCategoryMany(list, to);
     return list.length;
   }
+
+  /// 按类别平移未完成任务的日期（due / t 与 plan: 一起移动；已完成和没有日期的不动）。
+  Future<int> shiftCategory(String? category, int days) =>
+      shiftMany(todo.where((t) => t.category == category), days);
 
   /// 批量平移日期（due / t 同时 +days；没有日期的任务不动）。返回被移动的条数。
   Future<int> shiftMany(Iterable<TodoItem> items, int days) async {

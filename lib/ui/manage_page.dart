@@ -6,7 +6,7 @@ import '../logic/estimator.dart';
 import 'category_widgets.dart';
 import 'timer_page.dart';
 
-/// 批量管理：删除全部、清空已完成、按类别删除 / 重命名。
+/// 批量管理：删除全部、清空已完成、按类别删除 / 重命名 / 平移日期。
 class ManagePage extends StatelessWidget {
   final TodoStore store;
   final FocusStore? focus;
@@ -37,6 +37,47 @@ class ManagePage extends StatelessWidget {
         duration: const Duration(seconds: 5),
         action: SnackBarAction(label: '撤销', onPressed: () => store.undo())));
   }
+
+  Future<void> _shiftCategory(BuildContext context, String? c) async {
+    final dated = store.todo.where((t) => t.category == c && t.date != null).toList();
+    if (dated.isEmpty) {
+      final m = ScaffoldMessenger.of(context);
+      m.clearSnackBars();
+      m.showSnackBar(const SnackBar(content: Text('该类别没有可平移日期的待办')));
+      return;
+    }
+    final days = TextEditingController(text: '1');
+    final n = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('平移「${store.categoryLabel(c)}」的日期（${dated.length} 项待办）'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+            key: const Key('shift_days_field'),
+            controller: days,
+            keyboardType: const TextInputType.numberWithOptions(signed: true),
+            decoration: const InputDecoration(
+                labelText: '天数',
+                helperText: '正数 = 推迟，负数 = 提前；截止日期、开始日期和原计划日期一起移动，已完成不改',
+                border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, children: [
+            for (final v in [-7, -1, 1, 7])
+              ActionChip(key: Key('shift_days_$v'), label: Text(v > 0 ? '+$v' : '$v'), onPressed: () => days.text = '$v'),
+          ]),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, int.tryParse(days.text.trim())), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (n == null || n == 0) return;
+    final moved = await store.shiftCategory(c, n);
+    if (context.mounted) _toast(context, '已把「${store.categoryLabel(c)}」的 $moved 项待办${n > 0 ? '推迟' : '提前'} ${n.abs()} 天');
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +145,13 @@ class ManagePage extends StatelessWidget {
                       },
                       child: Text(focus!.isRunning && focus!.runningCategory == c ? '继续' : '开始'),
                     ),
+                  IconButton(
+                    key: Key('manage_shift_${c ?? ''}'),
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.date_range),
+                    tooltip: '平移该类别日期',
+                    onPressed: () => _shiftCategory(context, c),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.drive_file_rename_outline),
                     tooltip: '重命名 / 合并到其它类别',
