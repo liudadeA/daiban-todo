@@ -209,6 +209,63 @@ void main() {
       await store.undo();
       expect(store.done.length, 1);
     });
+
+    test('按类别平移：整类未完成日期一起移动，其它类别与已完成不动，可持久化', () async {
+      await store.setPullForward(false);
+      await store.complete(find('408 A1'));
+      expect(due(store.done.single), '2026-11-11');
+      expect(await store.shiftCategory('408', 2), 3);
+      expect(due(find('408 A2')), '2026-11-13');
+      expect(due(find('408 B')), '2026-11-14');
+      expect(due(find('408 C')), '2026-11-15');
+      expect(Ymd.fmt(find('408 A2').plan!), '2026-11-13');
+      expect(due(find('数学 A')), '2026-11-11');
+      expect(due(find('数学 B')), '2026-11-12');
+      expect(due(find('杂事 今天')), '2026-11-11');
+      expect(due(store.done.single), '2026-11-11');
+      store = await open();
+      TodoItem f(String t) => store.todo.firstWhere((x) => x.text == t);
+      expect(due(f('408 A2')), '2026-11-13');
+      expect(due(f('数学 A')), '2026-11-11');
+      expect(due(store.done.single), '2026-11-11');
+    });
+    test('按类别平移：可提前、也可自定义天数，并可撤销', () async {
+      expect(await store.shiftCategory('数学', -1), 2);
+      expect(due(find('数学 A')), '2026-11-10');
+      expect(due(find('数学 B')), '2026-11-11');
+      expect(due(find('408 A1')), '2026-11-11');
+      expect(await store.shiftCategory('数学', 5), 2);
+      expect(due(find('数学 A')), '2026-11-15');
+      expect(due(find('数学 B')), '2026-11-16');
+      await store.undo();
+      expect(due(find('数学 A')), '2026-11-10');
+      expect(due(find('数学 B')), '2026-11-11');
+    });
+    test('按类别平移：无日期任务不动，due / t / plan 一起移动；未分类可单独平移', () async {
+      await store.add('没日期 +408');
+      await store.add('带开始 +408 due:2026-11-20 t:2026-11-18');
+      expect(await store.shiftCategory('408', 3), 5); // A1 A2 B C + 带开始，没日期不动
+      final started = find('带开始');
+      expect(due(started), '2026-11-23');
+      expect(Ymd.fmt(started.start!), '2026-11-21');
+      expect(Ymd.fmt(started.plan!), '2026-11-23');
+      expect(find('没日期').date, isNull);
+      expect(await store.shiftCategory(null, 1), 2);
+      expect(due(find('杂事 今天')), '2026-11-12');
+      expect(due(find('杂事 明天')), '2026-11-13');
+      expect(due(find('408 A1')), '2026-11-14');
+    });
+    test('按类别平移会清除该类别的提前显示标记', () async {
+      await store.complete(find('408 A1'));
+      await store.complete(find('408 A2'));
+      expect(find('408 B').pulls, isNotEmpty);
+      expect(due(find('408 B')), '2026-11-12');
+      expect(await store.shiftCategory('408', 2), 2); // B, C
+      expect(find('408 B').pulls, isEmpty);
+      expect(due(find('408 B')), '2026-11-14');
+      expect(due(find('数学 B')), '2026-11-12');
+    });
+
     test('批量平移：没有日期的任务不动', () async {
       await store.add('没日期');
       final n = await store.shiftMany(store.todo.where((t) => t.text == '没日期'), 3);

@@ -126,15 +126,15 @@ Future<String?> showCategoryDialog(BuildContext context, TodoStore store,
 String _overwriteHint(ImportPreview p, String typed, bool keepOtherTags) {
   final assigned = TodoItem.normCategory(typed);
   if (assigned != null) {
-    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$assigned」这一类别的现有待办和已完成，其它类别不受影响。';
+    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$assigned」这一类别的现有待办，已完成保留，其它类别不受影响。';
   }
   if (!keepOtherTags) {
-    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换未分类的现有待办和已完成，已有类别不受影响。';
+    return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换未分类的现有待办，已完成保留，已有类别不受影响。';
   }
   final names = {
     for (final t in [...p.todo, ...p.done]) t.category ?? '未分类',
   }.toList()
     ..sort();
   final which = names.isEmpty ? '导入文件中的类别' : names.join('、');
-  return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$which」的现有待办和已完成，其它类别不受影响。';
+  return '「追加」保留现有任务（完全相同的任务自动跳过）；「覆盖」只替换「$which」的现有待办，已完成保留，其它类别不受影响。';
 }

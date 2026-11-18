@@ -42,12 +42,12 @@ void main() {
     final skipped = await s.applyImport(p, replace: true);
     expect(skipped, 0);
     expect(s.todo.map(textOf), ['旧数学待办', '旧未分类', '新408']);
-    expect(s.done.map(textOf), ['旧数学已完成', '旧未分类已完成', '新408已完成']);
+    expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成', '旧未分类已完成', '新408已完成']);
     expect(s.todo.any((t) => t.text == '旧408待办'), isFalse);
-    expect(s.done.any((t) => t.text == '旧408已完成'), isFalse);
+    expect(s.done.any((t) => t.text == '旧408已完成'), isTrue);
     s = await open();
     expect(s.todo.map(textOf), ['旧数学待办', '旧未分类', '新408']);
-    expect(s.done.map(textOf), ['旧数学已完成', '旧未分类已完成', '新408已完成']);
+    expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成', '旧未分类已完成', '新408已完成']);
     final names = (WidgetActions.snapshot(s)['rows'] as List).where((r) => r['type'] == 'task').map((r) => r['text']);
     expect(names, containsAll(['新408', '旧数学待办', '旧未分类']));
     expect(names, isNot(contains('旧408待办')));
@@ -57,14 +57,14 @@ void main() {
     final p = s.preview('新408 +408 due:2026-11-17\n新数学 +数学 due:2026-11-18');
     await s.applyImport(p, replace: true);
     expect(s.todo.map(textOf), ['旧未分类', '新408', '新数学']);
-    expect(s.done.map(textOf), ['旧未分类已完成']);
+    expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成', '旧未分类已完成']);
   });
 
   test('只导入未分类时，仅替换未分类，已有类别不动', () async {
     final p = s.preview('新未分类 due:2026-11-18');
     await s.applyImport(p, replace: true);
     expect(s.todo.map(textOf), ['旧408待办', '旧数学待办', '新未分类']);
-    expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成']);
+    expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成', '旧未分类已完成']);
   });
 
   test('对话框设定类别后再覆盖：只替换设定后的那一个类别', () async {
@@ -75,6 +75,7 @@ void main() {
     expect(s.todo.where((t) => t.category == '数学').map(textOf), ['来自日历', '另一条']);
     expect(s.todo.where((t) => t.category == '408').map(textOf), ['旧408待办']);
     expect(s.done.where((t) => t.category == '408').map(textOf), ['旧408已完成']);
+    expect(s.done.where((t) => t.category == '数学').map(textOf), ['旧数学已完成']);
     expect(s.todo.any((t) => t.text == '旧数学待办'), isFalse);
   });
 
@@ -96,7 +97,8 @@ void main() {
     expect(s.todo.any((t) => t.category == '408' && t.text == '旧408待办'), isFalse);
     expect(s.todo.where((t) => t.category == '408').length, p.todo.length);
     expect(s.todo.map(textOf), containsAll(['旧数学待办', '旧未分类']));
-    expect(s.done.map(textOf), containsAll(['旧数学已完成', '旧未分类已完成']));
+    expect(s.done.map(textOf), containsAll(['旧408已完成', '旧数学已完成', '旧未分类已完成']));
+    expect(s.done.where((t) => t.category == '408').map(textOf), ['旧408已完成']);
   });
 
   test('覆盖后可一步撤销，恢复被替换类别及其它任务', () async {
@@ -104,6 +106,18 @@ void main() {
     await s.undo();
     expect(s.todo.map(textOf), ['旧408待办', '旧数学待办', '旧未分类']);
     expect(s.done.map(textOf), ['旧408已完成', '旧数学已完成', '旧未分类已完成']);
+  });
+
+
+  test('覆盖时已有已完成完全相同则跳过，不会重复追加', () async {
+    final skipped = await s.applyImport(
+        s.preview('新408 +408 due:2026-11-16\n'
+            'x 2026-11-15 旧408已完成 +408 due:2026-11-15\n'),
+        replace: true);
+    expect(skipped, 1);
+    expect(s.done.where((t) => t.text == '旧408已完成').length, 1);
+    expect(s.todo.map(textOf), contains('新408'));
+    expect(s.todo.any((t) => t.text == '旧408待办'), isFalse);
   });
 
   testWidgets('导入对话框不再暗示清空全部，提示随类别输入变化', (tester) async {
@@ -117,13 +131,17 @@ void main() {
     await tester.pumpAndSettle();
     final hint = tester.widget<Text>(find.byKey(const Key('import_overwrite_hint')));
     expect(hint.data, contains('只替换「408」这一类别'));
+    expect(hint.data, contains('已完成保留'));
     expect(hint.data, isNot(contains('会先清空现有待办和已完成')));
+    expect(hint.data, isNot(contains('现有待办和已完成')));
     await tester.enterText(find.byType(TextField), '');
     await tester.pump();
     expect(tester.widget<Text>(find.byKey(const Key('import_overwrite_hint'))).data, contains('只替换「408、数学」'));
+    expect(tester.widget<Text>(find.byKey(const Key('import_overwrite_hint'))).data, contains('已完成保留'));
     await tester.tap(find.text('保留任务原有的其它 +标签'));
     await tester.pump();
     expect(tester.widget<Text>(find.byKey(const Key('import_overwrite_hint'))).data, contains('只替换未分类'));
+    expect(tester.widget<Text>(find.byKey(const Key('import_overwrite_hint'))).data, contains('已完成保留'));
     await tester.tap(find.text('取消'));
     expect(await future, isNull);
   });
